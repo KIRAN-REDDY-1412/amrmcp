@@ -37,7 +37,8 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [copiedSQL, setCopiedSQL] = useState(false);
 
   // Forms Modals Toggle
-  const [activeModal, setActiveModal] = useState<'create_dept' | 'edit_dept' | 'create_user' | 'edit_user' | 'create_student' | 'edit_student' | 'reset_password' | null>(null);
+  const [activeModal, setActiveModal] = useState<'create_dept' | 'edit_dept' | 'create_user' | 'edit_user' | 'create_student' | 'edit_student' | 'reset_password' | 'view_users' | null>(null);
+  const [viewRole, setViewRole] = useState<'principal' | 'hod' | 'faculty' | null>(null);
 
   // Pagination & Search States
   const [currentPage, setCurrentPage] = useState(1);
@@ -480,7 +481,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
       {activeTab === 'overview' && (
         <div className="space-y-6 animate-fade-in">
           {/* Quick Metrics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="glass p-5 rounded-2xl border border-navy-100 dark:border-navy-800 flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                 <Building size={24} />
@@ -491,7 +492,25 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
               </div>
             </div>
 
-            <div className="glass p-5 rounded-2xl border border-navy-100 dark:border-navy-800 flex items-center gap-4">
+            <div 
+              className="glass p-5 rounded-2xl border border-navy-100 dark:border-navy-800 flex items-center gap-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-navy-900 transition-colors"
+              onClick={() => { setViewRole('principal'); setActiveModal('view_users'); }}
+            >
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                <Users size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-navy-400 uppercase tracking-wider">Principals</p>
+                <p className="text-2xl font-black text-navy-950 dark:text-white mt-1">
+                  {dbState.users.filter((u) => u.role === 'principal').length}
+                </p>
+              </div>
+            </div>
+
+            <div 
+              className="glass p-5 rounded-2xl border border-navy-100 dark:border-navy-800 flex items-center gap-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-navy-900 transition-colors"
+              onClick={() => { setViewRole('hod'); setActiveModal('view_users'); }}
+            >
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                 <UserCheck size={24} />
               </div>
@@ -503,7 +522,10 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
               </div>
             </div>
 
-            <div className="glass p-5 rounded-2xl border border-navy-100 dark:border-navy-800 flex items-center gap-4">
+            <div 
+              className="glass p-5 rounded-2xl border border-navy-100 dark:border-navy-800 flex items-center gap-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-navy-900 transition-colors"
+              onClick={() => { setViewRole('faculty'); setActiveModal('view_users'); }}
+            >
               <div className="w-12 h-12 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 flex items-center justify-center">
                 <Users size={24} />
               </div>
@@ -916,6 +938,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                 {activeModal === 'reset_password' && 'Perform Password Override'}
                 {activeModal === 'create_student' && 'Register Student Profile'}
                 {activeModal === 'edit_student' && 'Modify Student Record'}
+                {activeModal === 'view_users' && (viewRole === 'principal' ? 'Principals' : viewRole === 'hod' ? 'Head of Departments' : 'Faculty')}
               </h4>
               <button
                 onClick={() => setActiveModal(null)}
@@ -1291,6 +1314,41 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                   Save Changes
                 </button>
               </form>
+            )}
+            {/* G. View Users List */}
+            {activeModal === 'view_users' && viewRole && (
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 mt-4">
+                {dbState.users.filter(u => u.role === viewRole).length === 0 ? (
+                  <p className="text-center py-8 text-sm text-navy-500">No users found for this role.</p>
+                ) : (
+                  dbState.users
+                    .filter(u => u.role === viewRole)
+                    .map(u => {
+                      let deptNameVal = 'N/A';
+                      if (u.role === 'hod') {
+                        const h = dbState.hods.find(hod => hod.user_id === u.id);
+                        if (h) deptNameVal = getDeptName(h.department_id);
+                      } else if (u.role === 'faculty') {
+                        const f = dbState.faculty.find(fac => fac.user_id === u.id);
+                        if (f) deptNameVal = getDeptName(f.department_id);
+                      }
+                      
+                      return (
+                        <div key={u.id} className="p-3 bg-slate-50 dark:bg-navy-950 rounded-xl border border-slate-100 dark:border-navy-900 flex justify-between items-center">
+                          <div>
+                            <p className="font-bold text-navy-900 dark:text-white text-sm">{u.full_name}</p>
+                            <p className="text-xs text-navy-500 font-mono mt-0.5">{u.email}</p>
+                          </div>
+                          {deptNameVal !== 'N/A' && (
+                            <span className="text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-navy-900 px-2 py-1 rounded-lg">
+                              {deptNameVal}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })
+                )}
+              </div>
             )}
           </div>
         </div>

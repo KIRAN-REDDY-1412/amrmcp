@@ -210,18 +210,20 @@ ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 -- ROW LEVEL SECURITY POLICIES
 -- =======================================================
 
--- -- 1. USERS POLICIES --
 CREATE POLICY select_users ON users FOR SELECT TO authenticated
     USING (true);
 
 CREATE POLICY admin_manage_users ON users FOR ALL TO authenticated
     USING (public.get_my_role() = 'admin');
 
-CREATE POLICY principal_manage_hods ON users FOR ALL TO authenticated
-    USING (public.get_my_role() = 'principal' AND role = 'hod');
+CREATE POLICY principal_manage_roles ON users FOR ALL TO authenticated
+    USING (public.get_my_role() = 'principal' AND role IN ('hod', 'faculty', 'student'));
 
-CREATE POLICY hod_manage_faculty ON users FOR ALL TO authenticated
-    USING (public.get_my_role() = 'hod' AND role = 'faculty');
+CREATE POLICY hod_manage_roles ON users FOR ALL TO authenticated
+    USING (public.get_my_role() = 'hod' AND role IN ('faculty', 'student'));
+
+CREATE POLICY faculty_manage_roles ON users FOR ALL TO authenticated
+    USING (public.get_my_role() = 'faculty' AND role = 'student');
 
 
 -- -- 2. DEPARTMENTS POLICIES --
@@ -248,12 +250,11 @@ CREATE POLICY admin_principal_manage_hods ON hods FOR ALL TO authenticated
     USING (public.get_my_role() IN ('admin', 'principal'));
 
 
--- -- 5. FACULTY POLICIES --
 CREATE POLICY select_faculty ON faculty FOR SELECT TO authenticated
     USING (true);
 
-CREATE POLICY admin_manage_faculty ON faculty FOR ALL TO authenticated
-    USING (public.get_my_role() = 'admin');
+CREATE POLICY admin_principal_manage_faculty ON faculty FOR ALL TO authenticated
+    USING (public.get_my_role() IN ('admin', 'principal'));
 
 CREATE POLICY hod_manage_dept_faculty ON faculty FOR ALL TO authenticated
     USING (public.get_my_role() = 'hod' AND department_id = public.get_my_dept());
@@ -263,7 +264,6 @@ CREATE POLICY faculty_update_own_profile ON faculty FOR UPDATE TO authenticated
     WITH CHECK (user_id = auth.uid());
 
 
--- -- 6. STUDENTS POLICIES --
 CREATE POLICY select_students ON students FOR SELECT TO authenticated
     USING (true);
 
@@ -272,6 +272,9 @@ CREATE POLICY admin_principal_manage_students ON students FOR ALL TO authenticat
 
 CREATE POLICY hod_manage_dept_students ON students FOR ALL TO authenticated
     USING (public.get_my_role() = 'hod' AND department_id = public.get_my_dept());
+
+CREATE POLICY faculty_manage_dept_students ON students FOR ALL TO authenticated
+    USING (public.get_my_role() = 'faculty' AND department_id = public.get_my_dept());
 
 
 -- -- 7. SUBJECTS POLICIES --

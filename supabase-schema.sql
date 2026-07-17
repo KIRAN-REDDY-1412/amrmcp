@@ -74,8 +74,14 @@ CREATE TABLE faculty (
 -- 6. STUDENTS TABLE
 CREATE TABLE students (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
     name TEXT NOT NULL,
     roll_number TEXT NOT NULL UNIQUE,
+    course TEXT,
+    branch TEXT,
+    year TEXT,
+    semester TEXT,
+    section TEXT,
     department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
     phone TEXT NOT NULL,
     guardian_name TEXT NOT NULL,

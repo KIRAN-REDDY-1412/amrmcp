@@ -8,7 +8,7 @@ export interface User {
   id: string;
   email: string;
   password?: string; // Kept for interface compatibility
-  role: 'admin' | 'principal' | 'hod' | 'faculty';
+  role: 'admin' | 'principal' | 'hod' | 'faculty' | 'student';
   full_name: string;
   is_active: boolean;
   created_at: string;
@@ -54,8 +54,14 @@ export interface Faculty {
 
 export interface Student {
   id: string;
+  user_id?: string;
   name: string;
   roll_number: string;
+  course?: string; // e.g. "B.PHARM"
+  branch?: string; // Nullable, used for M.Pharm
+  year?: string;
+  semester?: string; // Nullable, not used for Pharm.D
+  section?: string; // e.g. A, B, C, D
   department_id: string;
   phone: string;
   guardian_name: string;
@@ -68,6 +74,9 @@ export interface Subject {
   code: string;
   department_id: string;
   credits: number;
+  year?: string;
+  semester?: string;
+  course?: string;
 }
 
 export interface SubjectAssignment {
@@ -85,14 +94,27 @@ export interface TimetableSlot {
   start_time: string;  // e.g. "09:00"
   end_time: string;    // e.g. "10:00"
   room: string;
+  section?: string;
 }
 
 export interface AttendanceRecord {
   id: string;
-  subject_id: string;
   student_id: string;
+  roll_number: string;
+  faculty_id: string;
+  subject_id: string;
+  course: string;
+  branch?: string;
+  year: string;
+  semester?: string;
+  section: string;
   date: string;
-  status: 'Present' | 'Absent';
+  period: string; // e.g., "Period 1"
+  status: 'Present' | 'Absent' | 'Late';
+  created_at: string;
+  updated_at: string;
+  last_modified_by?: string;
+  modify_reason?: string;
 }
 
 export interface MarkRecord {
@@ -384,22 +406,43 @@ export class Database {
     const authClient = createAuthClient();
     const password = (user as any).password || 'DefaultPassword123!';
 
-    // 1. Sign up in Supabase Auth (secondary client to avoid stealing current session)
+    // 1. Sign up in Supabase Auth
     const { data: authData, error: authError } = await authClient.auth.signUp({
       email: user.email,
       password,
     });
-    if (authError) throw authError;
-    if (!authData.user) throw new Error('Failed to register auth user in Supabase.');
+
+    let newUserId = authData?.user?.id;
+
+    if (authError) {
+      if (authError.message.includes('already registered') || authError.message.includes('already exist')) {
+        // The user is in Auth. Try to sign in to get their UUID!
+        const { data: signInData, error: signInError } = await authClient.auth.signInWithPassword({
+          email: user.email,
+          password
+        });
+        
+        if (signInData?.user) {
+          newUserId = signInData.user.id;
+        } else {
+          // If we can't sign in (wrong password for existing test account)
+          throw new Error(`Roll Number already exists in the system with a different password. Please use a unique Roll Number.`);
+        }
+      } else {
+        throw authError;
+      }
+    }
+
+    if (!newUserId) throw new Error('Failed to register auth user in Supabase.');
 
     const newUser: User = {
       ...user,
-      id: authData.user.id,
+      id: newUserId,
       created_at: new Date().toISOString(),
     };
 
-    // 2. Insert into public.users
-    const { error: dbError } = await supabase.from('users').insert([{
+    // 2. Insert into public.users. Use upsert to handle if they somehow already exist there
+    const { error: dbError } = await supabase.from('users').upsert([{
       id: newUser.id,
       email: newUser.email,
       role: newUser.role,
@@ -409,8 +452,12 @@ export class Database {
     }]);
     if (dbError) throw dbError;
 
-    this.state.users.push(newUser);
-    this.save();
+    // Ensure it's in local state
+    if (!this.state.users.find(u => u.id === newUser.id)) {
+      this.state.users.push(newUser);
+      this.save();
+    }
+    
     return newUser;
   }
 
@@ -598,6 +645,10 @@ export class Database {
     return this.state.students.find((s) => s.id === id);
   }
 
+  public getStudentByUserId(userId: string): Student | undefined {
+    return this.state.students.find((s) => s.user_id === userId);
+  }
+
   public getStudentsByDepartment(deptId: string): Student[] {
     return this.state.students.filter((s) => s.department_id === deptId);
   }
@@ -638,9 +689,129 @@ export class Database {
     return true;
   }
 
+  public async bulkPromoteStudents(course: string, fromYear: string, toYear: string): Promise<number> {
+    let updatedCount = 0;
+
+    this.state.students = this.state.students.map(student => {
+      if (student.course === course && student.year === fromYear) {
+        updatedCount++;
+        return { ...student, year: toYear };
+      }
+      return student;
+    });
+
+    if (updatedCount > 0) {
+      this.save();
+      // Attempt to sync to Supabase (if the year column exists in remote DB)
+      const { error } = await supabase
+        .from('students')
+        .update({ year: toYear })
+        .eq('course', course)
+        .eq('year', fromYear);
+        
+      if (error) {
+        console.error("Supabase bulk promote error (may not have column 'year' yet):", error);
+      }
+    }
+
+    return updatedCount;
+  }
+
+  // --- Attendance Management ---
+  public getStudentsByFilters(filters: {
+    course: string;
+    branch?: string;
+    year: string;
+    semester?: string;
+    section: string;
+  }): Student[] {
+    return this.state.students.filter(s => {
+      if (s.course !== filters.course) return false;
+      if (s.year !== filters.year) return false;
+      if (s.section !== filters.section) return false;
+      if (filters.course === 'M.PHARM' && s.branch !== filters.branch) return false;
+      if (filters.course !== 'PHARM.D' && s.semester !== filters.semester) return false;
+      return true;
+    });
+  }
+
+  public async saveAttendanceBatch(records: Omit<AttendanceRecord, 'id' | 'created_at' | 'updated_at'>[]): Promise<void> {
+    // Duplicate Check
+    for (const record of records) {
+      const exists = this.state.attendance.some(
+        a => a.student_id === record.student_id && a.date === record.date && a.subject_id === record.subject_id && a.period === record.period
+      );
+      if (exists) {
+        throw new Error(`Attendance has already been submitted for this class and period.`);
+      }
+    }
+
+    const newRecords: AttendanceRecord[] = records.map(r => ({
+      ...r,
+      id: generateUUID(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }));
+
+    // Save to Supabase (assuming there's a table 'attendance_records')
+    const { error } = await supabase.from('attendance_records').insert(newRecords);
+    if (error) {
+      console.error("Supabase insert error, falling back to local state:", error);
+    }
+
+    this.state.attendance.push(...newRecords);
+    this.save();
+  }
+
+  public getAttendanceByFilters(date: string, subjectId: string, period: string): AttendanceRecord[] {
+    return this.state.attendance.filter(a => a.date === date && a.subject_id === subjectId && a.period === period);
+  }
+
+  public async updateAttendanceRecord(
+    id: string, 
+    updates: Partial<Pick<AttendanceRecord, 'status'>>, 
+    modifierId: string, 
+    reason: string
+  ): Promise<void> {
+    const recordIndex = this.state.attendance.findIndex(a => a.id === id);
+    if (recordIndex === -1) throw new Error("Attendance record not found.");
+
+    const updatedRecord = {
+      ...this.state.attendance[recordIndex],
+      ...updates,
+      updated_at: new Date().toISOString(),
+      last_modified_by: modifierId,
+      modify_reason: reason
+    };
+
+    const { error } = await supabase.from('attendance_records').update(updatedRecord).eq('id', id);
+    if (error) {
+      console.error("Supabase update error:", error);
+    }
+
+    this.state.attendance[recordIndex] = updatedRecord;
+    this.save();
+  }
+
   // --- Subjects ---
   public getSubjects(): Subject[] {
     return this.state.subjects;
+  }
+
+  public async saveSubjectsBatch(subjects: Omit<Subject, 'id'>[]): Promise<void> {
+    const newSubjects: Subject[] = subjects.map(s => ({
+      ...s,
+      id: generateUUID()
+    }));
+
+    const { error } = await supabase.from('subjects').insert(newSubjects);
+    if (error) {
+      console.error("Supabase insert error for subjects:", error);
+      throw error;
+    }
+    
+    this.state.subjects.push(...newSubjects);
+    this.save();
   }
 
   public getSubjectById(id: string): Subject | undefined {

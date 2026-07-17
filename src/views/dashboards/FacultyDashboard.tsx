@@ -3,6 +3,8 @@ import { db } from '../../services/db';
 import type { AttendanceRecord, MarkRecord } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/Toast';
+import { StudentManagementTab } from '../../components/StudentManagementTab';
+import { AttendanceManager } from '../../components/AttendanceManager';
 import {
   Plus,
   Trash2,
@@ -22,7 +24,7 @@ interface DashboardProps {
   onTabChange?: (tabId: string) => void;
 }
 
-export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab }) => {
+export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilter }) => {
   const { currentUser, facultyProfile, updateProfileDetails } = useAuth();
   const { showToast } = useToast();
 
@@ -469,110 +471,20 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab }) => {
         </div>
       )}
 
-      {/* 3. STUDENT ATTENDANCE TAB */}
+      {/* 2.5. STUDENTS MANAGEMENT */}
+      {activeTab === 'students' && (
+        <StudentManagementTab searchFilter={searchFilter} />
+      )}
+
       {activeTab === 'attendance' && (
-        <div className="glass p-6 rounded-2xl border border-navy-100 dark:border-navy-800 space-y-6 animate-fade-in">
-          <div>
-            <h3 className="text-navy-900 dark:text-white font-bold text-lg">Mark Student Attendance</h3>
-            <p className="text-xs text-navy-400">Record present/absent statuses for assigned classes</p>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center bg-white dark:bg-navy-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-navy-800 animate-fade-in">
+            <div>
+              <h2 className="text-xl font-bold text-navy-900 dark:text-white">Student Attendance</h2>
+              <p className="text-sm text-navy-500 mt-1">Manage daily attendance for your classes</p>
+            </div>
           </div>
-
-          {myAssignedSubjects.length === 0 ? (
-            <div className="py-16 text-center text-navy-450 bg-slate-50 dark:bg-navy-900/30 rounded-2xl border border-dashed border-slate-200 dark:border-navy-800">
-              <AlertCircle className="mx-auto w-10 h-10 text-navy-300 dark:text-navy-700 mb-2" />
-              <p className="font-bold text-sm">No Subjects Allocated</p>
-              <p className="text-xs mt-1 text-navy-400">You must be assigned to at least one subject by the HOD to mark attendance.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* filters bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-navy-950/60 border border-slate-100 dark:border-navy-850 rounded-2xl">
-                <div>
-                  <label className="block text-xs font-bold text-navy-500 uppercase">Subject</label>
-                  <select
-                    value={selectedAttSubId}
-                    onChange={(e) => setSelectedAttSubId(e.target.value)}
-                    className="mt-1 block w-full p-2.5 rounded-xl border border-slate-200 dark:border-navy-800 bg-white dark:bg-navy-950 text-xs font-semibold text-navy-900 dark:text-white"
-                  >
-                    <option value="">-- Choose Subject --</option>
-                    {myAssignedSubjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy-500 uppercase">Roll Date</label>
-                  <input
-                    type="date"
-                    value={attDate}
-                    onChange={(e) => setAttDate(e.target.value)}
-                    className="mt-1 block w-full p-2.5 rounded-xl border border-slate-200 dark:border-navy-800 bg-white dark:bg-navy-950 text-xs font-semibold text-navy-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              {/* Attendance Table */}
-              {!selectedAttSubId ? (
-                <div className="py-12 text-center text-xs text-navy-450 font-semibold bg-slate-50/50 dark:bg-navy-950/20 rounded-2xl">
-                  Select a subject and date above to load student class list.
-                </div>
-              ) : myDeptStudents.length === 0 ? (
-                <div className="py-12 text-center text-xs text-navy-450">
-                  No students are enrolled in this department. Register student profiles under HOD dashboard first.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm border-collapse">
-                      <thead>
-                        <tr className="border-b border-slate-200 dark:border-navy-800 text-navy-400 font-bold text-xs uppercase tracking-wider">
-                          <th className="pb-3 pl-2">Student Name</th>
-                          <th className="pb-3">Roll Number</th>
-                          <th className="pb-3 pr-2 text-right">Attendance Roll Call</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-navy-850 font-medium">
-                        {myDeptStudents.map((student) => {
-                          const status = attendanceStatuses[student.id] || 'Present';
-                          return (
-                            <tr key={student.id} className="text-navy-950 dark:text-navy-200">
-                              <td className="py-3 pl-2 font-bold">{student.name}</td>
-                              <td className="py-3 text-xs font-mono font-bold text-primary-500">{student.roll_number}</td>
-                              <td className="py-3 pr-2 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleAttendance(student.id)}
-                                  className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm ${
-                                    status === 'Present'
-                                      ? 'bg-green-600 text-white shadow-green-500/10'
-                                      : 'bg-red-650 bg-red-600 text-white shadow-red-500/10'
-                                  }`}
-                                >
-                                  {status === 'Present' ? <Check size={13} /> : <X size={13} />}
-                                  <span>{status}</span>
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-navy-800">
-                    <button
-                      onClick={handleSaveAttendance}
-                      className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold shadow-md shadow-primary-500/20"
-                    >
-                      Save Class Attendance
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <AttendanceManager canEditSubmitted={false} />
         </div>
       )}
 

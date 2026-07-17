@@ -3,6 +3,7 @@ import { ToastProvider } from './components/Toast';
 import { useRoute } from './services/navigation';
 import { LandingPage } from './views/LandingPage';
 import { LoginPage } from './views/LoginPage';
+import { RegisterPage } from './views/RegisterPage';
 import { DashboardContainer } from './views/DashboardContainer';
 
 function AppContent() {
@@ -28,6 +29,8 @@ function AppContent() {
       return <LandingPage />;
     case 'login':
       return <LoginPage />;
+    case 'register':
+      return <RegisterPage />;
     case 'dashboard':
       return <DashboardContainer />;
     default:

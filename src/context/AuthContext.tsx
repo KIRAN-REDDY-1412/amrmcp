@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db } from '../services/db';
-import type { User, Principal, HOD, Faculty } from '../services/db';
+import type { User, Principal, HOD, Faculty, Student } from '../services/db';
 import { navigation } from '../services/navigation';
 import { supabase } from '../services/supabase';
 
@@ -9,6 +9,7 @@ interface AuthContextType {
   principalProfile: Principal | null;
   hodProfile: HOD | null;
   facultyProfile: Faculty | null;
+  studentProfile: Student | null;
   loading: boolean;
   login: (email: string, password: string, role: User['role']) => Promise<void>;
   logout: () => void;
@@ -25,6 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [principalProfile, setPrincipalProfile] = useState<Principal | null>(null);
   const [hodProfile, setHODProfile] = useState<HOD | null>(null);
   const [facultyProfile, setFacultyProfile] = useState<Faculty | null>(null);
+  const [studentProfile, setStudentProfile] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadProfile = (user: User) => {
@@ -33,20 +35,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setPrincipalProfile(p || null);
       setHODProfile(null);
       setFacultyProfile(null);
+      setStudentProfile(null);
     } else if (user.role === 'hod') {
       const h = db.getHODByUserId(user.id);
       setHODProfile(h || null);
       setPrincipalProfile(null);
       setFacultyProfile(null);
+      setStudentProfile(null);
     } else if (user.role === 'faculty') {
       const f = db.getFacultyByUserId(user.id);
       setFacultyProfile(f || null);
       setPrincipalProfile(null);
       setHODProfile(null);
+      setStudentProfile(null);
+    } else if (user.role === 'student') {
+      const s = db.getStudentByUserId(user.id);
+      setStudentProfile(s || null);
+      setPrincipalProfile(null);
+      setHODProfile(null);
+      setFacultyProfile(null);
     } else {
       setPrincipalProfile(null);
       setHODProfile(null);
       setFacultyProfile(null);
+      setStudentProfile(null);
     }
   };
 
@@ -89,6 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setPrincipalProfile(null);
         setHODProfile(null);
         setFacultyProfile(null);
+        setStudentProfile(null);
       }
     });
 
@@ -169,6 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPrincipalProfile(null);
     setHODProfile(null);
     setFacultyProfile(null);
+    setStudentProfile(null);
     navigation.navigate('landing');
   };
 
@@ -281,6 +295,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         principalProfile,
         hodProfile,
         facultyProfile,
+        studentProfile,
         loading,
         login,
         logout,

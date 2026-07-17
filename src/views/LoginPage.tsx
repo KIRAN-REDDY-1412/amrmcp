@@ -20,7 +20,7 @@ export const LoginPage: React.FC = () => {
   const { login, registerSuperAdmin } = useAuth();
   const { showToast } = useToast();
   
-  const selectedRole = (route.params.role || 'faculty') as 'admin' | 'principal' | 'hod' | 'faculty';
+  const selectedRole = (route.params.role || 'faculty') as 'admin' | 'principal' | 'hod' | 'faculty' | 'student';
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,7 +53,11 @@ export const LoginPage: React.FC = () => {
     
     setLoading(true);
     try {
-      await login(email, password, selectedRole);
+      let loginId = email;
+      if (selectedRole === 'student' && !email.includes('@')) {
+        loginId = `${email.toLowerCase()}@student.amreddy.edu`;
+      }
+      await login(loginId, password, selectedRole);
       showToast('Logged in successfully.', 'success');
     } catch (err: any) {
       showToast(err.message || 'Authentication failed.', 'error');
@@ -272,18 +276,18 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleLoginSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-semibold text-navy-700 dark:text-navy-300">
-                Username or Email
+                {selectedRole === 'student' ? 'Roll Number' : 'Username or Email'}
               </label>
               <div className="mt-1.5 relative rounded-xl shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-navy-400">
                   <Mail size={18} />
                 </div>
                 <input
-                  type="email"
+                  type={selectedRole === 'student' ? "text" : "email"}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. name@amreddy.edu"
+                  placeholder={selectedRole === 'student' ? "e.g. Y26PH001" : "e.g. name@amreddy.edu"}
                   className="block w-full pl-10 pr-4 py-2.5 bg-white dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-xl text-navy-900 dark:text-white placeholder-navy-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm transition-all"
                 />
               </div>
@@ -338,6 +342,21 @@ export const LoginPage: React.FC = () => {
               Sign In
             </button>
           </form>
+
+          {selectedRole === 'student' && (
+            <div className="mt-4 text-center">
+              <p className="text-sm text-navy-600 dark:text-navy-400">
+                Are you a new student?{' '}
+                <button
+                  type="button"
+                  onClick={() => navigation.navigate('register')}
+                  className="font-bold text-primary-600 hover:text-primary-500 transition-colors"
+                >
+                  Register here
+                </button>
+              </p>
+            </div>
+          )}
 
           {/* Test Hint Panel */}
           {selectedRole === 'admin' && !isEmptyDB && (

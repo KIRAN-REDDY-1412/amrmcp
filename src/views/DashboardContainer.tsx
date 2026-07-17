@@ -8,6 +8,7 @@ import { AdminDashboard } from './dashboards/AdminDashboard';
 import { PrincipalDashboard } from './dashboards/PrincipalDashboard';
 import { HODDashboard } from './dashboards/HODDashboard';
 import { FacultyDashboard } from './dashboards/FacultyDashboard';
+import { StudentDashboard } from './dashboards/StudentDashboard';
 import { CollegeLogo } from '../components/Icons';
 import {
   LayoutDashboard,
@@ -115,12 +116,18 @@ export const DashboardContainer: React.FC = () => {
         ...common,
         { id: 'departments', label: 'Departments', icon: Building },
         { id: 'users', label: 'Users Management', icon: UserCheck },
+        { id: 'students', label: 'Student Management', icon: GraduationCap },
+        { id: 'attendance', label: 'Student Attendance', icon: FileCheck2 },
         { id: 'database', label: 'Database & Sync', icon: ShieldCheck },
       ];
     } else if (currentUser.role === 'principal') {
       return [
         ...common,
         { id: 'hods', label: 'HOD Directory', icon: Users },
+        { id: 'students', label: 'Student Management', icon: GraduationCap },
+        { id: 'attendance', label: 'Student Attendance', icon: FileCheck2 },
+        { id: 'subjects', label: 'Subjects & Loads', icon: BookOpen },
+        { id: 'timetable', label: 'Timetable', icon: CalendarDays },
         { id: 'salaries', label: 'Salary Management', icon: Banknote },
         { id: 'notices', label: 'Notices', icon: Bell },
         { id: 'approvals', label: 'Approvals', icon: FileCheck2 },
@@ -130,6 +137,7 @@ export const DashboardContainer: React.FC = () => {
         ...common,
         { id: 'faculty', label: 'Faculty Management', icon: UserCheck },
         { id: 'students', label: 'Student Management', icon: GraduationCap },
+        { id: 'attendance', label: 'Student Attendance', icon: FileCheck2 },
         { id: 'subjects', label: 'Subjects & Loads', icon: BookOpen },
         { id: 'leaves', label: 'Leave Requests', icon: FileCheck2 },
       ];
@@ -137,9 +145,15 @@ export const DashboardContainer: React.FC = () => {
       return [
         ...common,
         { id: 'timetable', label: 'My Timetable', icon: CalendarDays },
+        { id: 'students', label: 'Student Management', icon: GraduationCap },
         { id: 'attendance', label: 'Student Attendance', icon: FileCheck2 },
         { id: 'marks', label: 'Marks Entry', icon: BookOpen },
         { id: 'leaves', label: 'Apply Leave', icon: CalendarDays },
+      ];
+    } else if (currentUser.role === 'student') {
+      return [
+        ...common,
+        { id: 'timetable', label: 'My Timetable', icon: CalendarDays },
       ];
     }
     return common;
@@ -163,6 +177,12 @@ export const DashboardContainer: React.FC = () => {
         return <HODDashboard activeTab={activeTab} searchFilter={searchQuery} onTabChange={setActiveTab} />;
       case 'faculty':
         return <FacultyDashboard activeTab={activeTab} searchFilter={searchQuery} onTabChange={setActiveTab} />;
+      case 'student':
+        return (
+          <div className="p-8 max-w-7xl mx-auto">
+            <StudentDashboard activeTab={activeTab} />
+          </div>
+        );
       default:
         return <div>Dashboard component not found.</div>;
     }

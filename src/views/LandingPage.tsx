@@ -9,7 +9,8 @@ import {
   ShieldCheck, 
   Sun, 
   Moon,
-  Info
+  Info,
+  User
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -63,6 +64,17 @@ export const LandingPage: React.FC = () => {
       darkBg: 'dark:bg-indigo-950/20 dark:hover:bg-indigo-950/30',
       borderColor: 'border-indigo-200 dark:border-indigo-900/40',
       iconColor: 'text-indigo-600 dark:text-indigo-400',
+    },
+    {
+      id: 'student',
+      title: 'Student Login',
+      description: 'Access attendance, academic records, assignments, and exam results.',
+      icon: User,
+      color: 'from-emerald-600 to-teal-700',
+      lightBg: 'bg-emerald-50/50 hover:bg-emerald-50',
+      darkBg: 'dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30',
+      borderColor: 'border-emerald-200 dark:border-emerald-900/40',
+      iconColor: 'text-emerald-600 dark:text-emerald-400',
     },
     {
       id: 'admin',
@@ -133,15 +145,15 @@ export const LandingPage: React.FC = () => {
           </div>
         )}
 
-        {/* Four Role Selection Cards */}
-        <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
+        {/* Role Selection Cards */}
+        <div className="mt-12 flex flex-wrap justify-center gap-6 w-full max-w-7xl">
           {loginRoles.map((role) => {
             const IconComp = role.icon;
             return (
               <div
                 key={role.id}
                 onClick={() => handleRoleSelect(role.id)}
-                className={`group cursor-pointer rounded-2xl border p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-white dark:bg-navy-900/60 ${role.borderColor} hover:border-primary-500/40`}
+                className={`group cursor-pointer rounded-2xl border p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-white dark:bg-navy-900/60 ${role.borderColor} hover:border-primary-500/40 w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[calc(20%-20px)]`}
               >
                 <div>
                   {/* Icon Block with subtle gradient background */}

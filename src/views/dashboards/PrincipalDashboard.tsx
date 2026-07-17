@@ -4,6 +4,10 @@ import type { User, HOD } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/Toast';
 import { DonutChart, BarChart } from '../../components/Charts';
+import { StudentManagementTab } from '../../components/StudentManagementTab';
+import { AttendanceManager } from '../../components/AttendanceManager';
+import { SubjectManagementTab } from '../../components/SubjectManagementTab';
+import { TimetableManagementTab } from '../../components/TimetableManagementTab';
 import {
   Building,
   Users,
@@ -441,6 +445,11 @@ export const PrincipalDashboard: React.FC<DashboardProps> = ({ activeTab, search
         </div>
       )}
 
+      {/* 1.5. STUDENTS MANAGEMENT */}
+      {activeTab === 'students' && (
+        <StudentManagementTab searchFilter={searchFilter} />
+      )}
+
       {/* 2. HOD DIRECTORY */}
       {activeTab === 'hods' && (
         <div className="glass p-6 rounded-2xl border border-navy-100 dark:border-navy-800 space-y-6 animate-fade-in">
@@ -664,6 +673,29 @@ export const PrincipalDashboard: React.FC<DashboardProps> = ({ activeTab, search
             </div>
           )}
         </div>
+      )}
+
+      {/* 4.5. ATTENDANCE MANAGEMENT */}
+      {activeTab === 'attendance' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="glass p-6 rounded-2xl border border-navy-100 dark:border-navy-800">
+            <div>
+              <h2 className="text-lg font-bold text-navy-900 dark:text-white">Student Attendance (Principal View)</h2>
+              <p className="text-xs text-navy-500 mt-1">View and edit attendance records across the entire college.</p>
+            </div>
+          </div>
+          <AttendanceManager canEditSubmitted={true} isReadOnly={false} />
+        </div>
+      )}
+
+      {/* 4.75. SUBJECTS & LOADS */}
+      {activeTab === 'subjects' && (
+        <SubjectManagementTab isPrincipal={true} />
+      )}
+
+      {/* 4.8. TIMETABLE MANAGEMENT */}
+      {activeTab === 'timetable' && (
+        <TimetableManagementTab />
       )}
 
       {/* 5. SALARIES MANAGEMENT */}

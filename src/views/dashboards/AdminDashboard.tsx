@@ -4,6 +4,8 @@ import type { User, Department, Student } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/Toast';
 import { DonutChart, BarChart } from '../../components/Charts';
+import { StudentManagementTab } from '../../components/StudentManagementTab';
+import { AttendanceManager } from '../../components/AttendanceManager';
 import {
   Building,
   Users,
@@ -63,13 +65,6 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [userPhone, setUserPhone] = useState('');
   const [userQual, setUserQual] = useState('');
   const [userDesg, setUserDesg] = useState('');
-
-  // Form Fields - Student
-  const [studName, setStudName] = useState('');
-  const [studRoll, setStudRoll] = useState('');
-  const [studDeptId, setStudDeptId] = useState('');
-  const [studPhone, setStudPhone] = useState('');
-  const [studGuardian, setStudGuardian] = useState('');
 
   // Form Fields - Password Reset
   const [newPasswordVal, setNewPasswordVal] = useState('');
@@ -348,99 +343,6 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     }
   };
 
-  // Student Actions
-  const handleCreateStudent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!studName || !studRoll || !studDeptId) return;
-
-    // Check Roll Number Uniqueness
-    const rollExists = dbState.students.some((s) => s.roll_number.toLowerCase() === studRoll.toLowerCase());
-    if (rollExists) {
-      showToast('Roll number already exists.', 'error');
-      return;
-    }
-
-    try {
-      await db.createStudent({
-        name: studName,
-        roll_number: studRoll,
-        department_id: studDeptId,
-        phone: studPhone,
-        guardian_name: studGuardian,
-      });
-
-      await db.logAction(
-        currentUser!.id,
-        currentUser!.email,
-        currentUser!.role,
-        'Create Student',
-        `Registered student: ${studName} (Roll: ${studRoll})`
-      );
-      showToast(`Student ${studName} registered.`, 'success');
-      setActiveModal(null);
-      triggerStateRefresh();
-
-      // Clear
-      setStudName('');
-      setStudRoll('');
-      setStudDeptId('');
-      setStudPhone('');
-      setStudGuardian('');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to register student.', 'error');
-    }
-  };
-
-  const handleEditStudentOpen = (s: Student) => {
-    setSelectedStudentId(s.id);
-    setStudName(s.name);
-    setStudRoll(s.roll_number);
-    setStudDeptId(s.department_id);
-    setStudPhone(s.phone);
-    setStudGuardian(s.guardian_name);
-    setActiveModal('edit_student');
-  };
-
-  const handleUpdateStudentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedStudentId || !studName || !studDeptId) return;
-
-    try {
-      await db.updateStudent(selectedStudentId, {
-        name: studName,
-        roll_number: studRoll,
-        department_id: studDeptId,
-        phone: studPhone,
-        guardian_name: studGuardian,
-      });
-
-      showToast('Student details updated.', 'success');
-      setActiveModal(null);
-      triggerStateRefresh();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to update student.', 'error');
-    }
-  };
-
-  const handleDeleteStudent = async (s: Student) => {
-    if (window.confirm(`Are you sure you want to delete student ${s.name}?`)) {
-      try {
-        await db.deleteStudent(s.id);
-        await db.logAction(
-          currentUser!.id,
-          currentUser!.email,
-          currentUser!.role,
-          'Delete Student',
-          `Removed student: ${s.name}`
-        );
-        showToast(`Student ${s.name} deleted.`, 'success');
-        triggerStateRefresh();
-      } catch (err: any) {
-        showToast(err.message || 'Failed to delete student.', 'error');
-      }
-    }
-  };
-
   // Helpers
   const getDeptName = (id: string) => {
     return dbState.departments.find((d) => d.id === id)?.name || 'N/A';
@@ -600,6 +502,11 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
             )}
           </div>
         </div>
+      )}
+
+      {/* 1.5. STUDENTS TAB */}
+      {activeTab === 'students' && (
+        <StudentManagementTab searchFilter={searchFilter} />
       )}
 
       {/* 2. DEPARTMENTS TAB */}
@@ -822,7 +729,17 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
         </div>
       )}
 
-
+      {activeTab === 'attendance' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center bg-white dark:bg-navy-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-navy-800 animate-fade-in">
+            <div>
+              <h2 className="text-xl font-bold text-navy-900 dark:text-white">Student Attendance (Admin View)</h2>
+              <p className="text-sm text-navy-500 mt-1">View and edit attendance records across the entire college.</p>
+            </div>
+          </div>
+          <AttendanceManager canEditSubmitted={true} isReadOnly={false} />
+        </div>
+      )}
 
       {/* 5. DATABASE & SYNC TAB */}
       {activeTab === 'database' && (
@@ -1154,7 +1071,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
               </form>
             )}
 
-            {/* D. Reset Password */}
+            {/* D. Password Reset Modal */}
             {activeModal === 'reset_password' && (
               <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
                 <div>
@@ -1177,144 +1094,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
               </form>
             )}
 
-            {/* E. Register Student */}
-            {activeModal === 'create_student' && (
-              <form onSubmit={handleCreateStudent} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Department</label>
-                  <select
-                    required
-                    value={studDeptId}
-                    onChange={(e) => setStudDeptId(e.target.value)}
-                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  >
-                    <option value="">-- Select Department --</option>
-                    {dbState.departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} ({d.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Student Name</label>
-                    <input
-                      type="text"
-                      required
-                      value={studName}
-                      onChange={(e) => setStudName(e.target.value)}
-                      placeholder="John Doe"
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Roll Number</label>
-                    <input
-                      type="text"
-                      required
-                      value={studRoll}
-                      onChange={(e) => setStudRoll(e.target.value)}
-                      placeholder="e.g. Y26PH001"
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white font-mono"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Phone</label>
-                  <input
-                    type="text"
-                    value={studPhone}
-                    onChange={(e) => setStudPhone(e.target.value)}
-                    placeholder="9876543210"
-                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Guardian Name</label>
-                  <input
-                    type="text"
-                    value={studGuardian}
-                    onChange={(e) => setStudGuardian(e.target.value)}
-                    placeholder="Father/Mother Name"
-                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm"
-                >
-                  Register Profile
-                </button>
-              </form>
-            )}
 
-            {/* F. Edit Student */}
-            {activeModal === 'edit_student' && (
-              <form onSubmit={handleUpdateStudentSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Department</label>
-                  <select
-                    required
-                    value={studDeptId}
-                    onChange={(e) => setStudDeptId(e.target.value)}
-                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  >
-                    {dbState.departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} ({d.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Student Name</label>
-                    <input
-                      type="text"
-                      required
-                      value={studName}
-                      onChange={(e) => setStudName(e.target.value)}
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Roll Number</label>
-                    <input
-                      type="text"
-                      required
-                      disabled
-                      value={studRoll}
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-100 dark:bg-navy-900 text-sm text-navy-400 font-mono cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Phone</label>
-                  <input
-                    type="text"
-                    value={studPhone}
-                    onChange={(e) => setStudPhone(e.target.value)}
-                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Guardian Name</label>
-                  <input
-                    type="text"
-                    value={studGuardian}
-                    onChange={(e) => setStudGuardian(e.target.value)}
-                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm"
-                >
-                  Save Changes
-                </button>
-              </form>
-            )}
             {/* G. View Users List */}
             {activeModal === 'view_users' && viewRole && (
               <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 mt-4">

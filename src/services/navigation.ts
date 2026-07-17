@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export type Path = 'landing' | 'login' | 'dashboard';
+export type Path = 'landing' | 'login' | 'dashboard' | 'register';
 
 export interface Route {
   path: Path;
@@ -28,7 +28,7 @@ class RouterService {
     const [pathPart, queryPart] = hash.split('?');
     
     let path: Path = 'landing';
-    if (pathPart === 'login' || pathPart === 'dashboard') {
+    if (pathPart === 'login' || pathPart === 'dashboard' || pathPart === 'register') {
       path = pathPart;
     }
     

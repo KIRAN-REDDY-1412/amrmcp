@@ -92,8 +92,7 @@ export const SubjectManagementTab: React.FC<Props> = ({ departmentId, isPrincipa
   const handleDeleteSubject = async (id: string, code: string) => {
     if (!window.confirm(`Are you sure you want to delete ${code}?`)) return;
     try {
-      const { error } = await db.deleteSubject(id);
-      if (error) throw error;
+      await db.deleteSubject(id);
       showToast('Subject deleted');
       setDbState(db.getRawState());
     } catch (err: any) {

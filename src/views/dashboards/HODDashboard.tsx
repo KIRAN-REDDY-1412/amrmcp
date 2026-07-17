@@ -607,7 +607,7 @@ export const HODDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilter
 
       {/* 4. SUBJECTS & ALLOCATIONS */}
       {activeTab === 'subjects' && (
-        <SubjectManagementTab departmentId={myHodProfile?.department_id} />
+        <SubjectManagementTab departmentId={hodProfile?.department_id} />
       )}
 
       {/* 5. LEAVE REQUESTS */}

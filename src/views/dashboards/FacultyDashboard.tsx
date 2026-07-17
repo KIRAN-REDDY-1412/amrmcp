@@ -42,11 +42,6 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
   const [leaveType, setLeaveType] = useState('Sick');
   const [leaveReason, setLeaveReason] = useState('');
 
-  // Attendance Form states
-  const [selectedAttSubId, setSelectedAttSubId] = useState('');
-  const [attDate, setAttDate] = useState(new Date().toISOString().split('T')[0]);
-  const [attendanceStatuses, setAttendanceStatuses] = useState<Record<string, 'Present' | 'Absent'>>({});
-
   // Marks Form states
   const [selectedMarkSubId, setSelectedMarkSubId] = useState('');
   const [examType, setExamType] = useState<'Internal' | 'Mid-term' | 'End-term'>('Internal');
@@ -137,59 +132,6 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
       setLeaveReason('');
     } catch (err: any) {
       showToast(err.message || 'Failed to submit leave request.', 'error');
-    }
-  };
-
-  // Load students and initialize attendance state
-  const handleLoadAttendanceList = () => {
-    if (!selectedAttSubId) return;
-
-    // Load existing statuses if they exist for this date
-    const existing = dbState.attendance.filter(
-      (a) => a.subject_id === selectedAttSubId && a.date === attDate
-    );
-
-    const initialStatuses: Record<string, 'Present' | 'Absent'> = {};
-    myDeptStudents.forEach((student) => {
-      const match = existing.find((e) => e.student_id === student.id);
-      initialStatuses[student.id] = match ? match.status : 'Present'; // Default to Present
-    });
-
-    setAttendanceStatuses(initialStatuses);
-  };
-
-  useEffect(() => {
-    handleLoadAttendanceList();
-  }, [selectedAttSubId, attDate, dbState.attendance]);
-
-  const handleToggleAttendance = (studentId: string) => {
-    setAttendanceStatuses((prev) => ({
-      ...prev,
-      [studentId]: prev[studentId] === 'Present' ? 'Absent' : 'Present',
-    }));
-  };
-
-  const handleSaveAttendance = async () => {
-    if (!selectedAttSubId) {
-      showToast('Select a subject first.', 'warning');
-      return;
-    }
-
-    const records: Omit<AttendanceRecord, 'id'>[] = Object.entries(attendanceStatuses).map(
-      ([studentId, status]) => ({
-        subject_id: selectedAttSubId,
-        student_id: studentId,
-        date: attDate,
-        status,
-      })
-    );
-
-    try {
-      await db.saveAttendanceBatch(records);
-      showToast('Attendance records saved successfully.', 'success');
-      triggerStateRefresh();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save attendance.', 'error');
     }
   };
 
@@ -473,7 +415,7 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
 
       {/* 2.5. STUDENTS MANAGEMENT */}
       {activeTab === 'students' && (
-        <StudentManagementTab searchFilter={searchFilter} />
+        <StudentManagementTab searchFilter={searchFilter || ''} />
       )}
 
       {activeTab === 'attendance' && (

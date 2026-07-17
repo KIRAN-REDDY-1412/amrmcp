@@ -77,6 +77,7 @@ export interface Subject {
   year?: string;
   semester?: string;
   course?: string;
+  branch?: string;
 }
 
 export interface SubjectAssignment {
@@ -942,33 +943,7 @@ export class Database {
     return this.state.attendance.filter((a) => a.subject_id === subjectId);
   }
 
-  public async saveAttendanceBatch(records: Omit<AttendanceRecord, 'id'>[]): Promise<void> {
-    const upsertRecords = records.map((record) => {
-      const existing = this.state.attendance.find(
-        (a) => a.subject_id === record.subject_id && a.student_id === record.student_id && a.date === record.date
-      );
-      return {
-        id: existing ? existing.id : generateUUID(),
-        subject_id: record.subject_id,
-        student_id: record.student_id,
-        date: record.date,
-        status: record.status,
-      };
-    });
 
-    const { error } = await supabase.from('attendance').upsert(upsertRecords);
-    if (error) throw error;
-
-    upsertRecords.forEach((record) => {
-      const idx = this.state.attendance.findIndex((a) => a.id === record.id);
-      if (idx > -1) {
-        this.state.attendance[idx] = record;
-      } else {
-        this.state.attendance.push(record);
-      }
-    });
-    this.save();
-  }
 
   // --- Marks ---
   public getMarks(): MarkRecord[] {
@@ -1067,7 +1042,7 @@ export class Database {
     return this.state.notices;
   }
 
-  public getNoticesForRole(role: 'admin' | 'principal' | 'hod' | 'faculty'): Notice[] {
+  public getNoticesForRole(role: User['role']): Notice[] {
     return this.state.notices.filter(
       (n) => n.target_role === 'All' || n.target_role.toLowerCase() === role.toLowerCase()
     );

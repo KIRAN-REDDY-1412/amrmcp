@@ -62,6 +62,8 @@ export interface Student {
   year?: string;
   semester?: string; // Nullable, not used for Pharm.D
   section?: string; // e.g. A, B, C, D
+  academic_year?: string;
+  batch?: string;
   department_id: string;
   phone: string;
   guardian_name: string;

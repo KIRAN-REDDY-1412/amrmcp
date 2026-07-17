@@ -27,6 +27,8 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
   const [studYear, setStudYear] = useState('');
   const [studSemester, setStudSemester] = useState('');
   const [studSection, setStudSection] = useState('');
+  const [studAcademicYear, setStudAcademicYear] = useState('');
+  const [studBatch, setStudBatch] = useState('');
   const [studDeptId, setStudDeptId] = useState('');
   const [studPhone, setStudPhone] = useState('');
   const [studGuardian, setStudGuardian] = useState('');
@@ -99,6 +101,8 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         year: studYear,
         semester: (studCourse === 'B.PHARM' || studCourse === 'M.PHARM') ? studSemester : undefined,
         section: studSection,
+        academic_year: studAcademicYear,
+        batch: studBatch,
         department_id: studDeptId,
         phone: studPhone,
         guardian_name: studGuardian,
@@ -125,6 +129,8 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
       setStudYear('');
       setStudSemester('');
       setStudSection('');
+      setStudAcademicYear('');
+      setStudBatch('');
       setStudDeptId('');
       setStudPhone('');
       setStudGuardian('');
@@ -143,6 +149,8 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
     setStudYear(s.year || '');
     setStudSemester(s.semester || '');
     setStudSection(s.section || '');
+    setStudAcademicYear(s.academic_year || '');
+    setStudBatch(s.batch || '');
     setStudDeptId(s.department_id);
     setStudPhone(s.phone);
     setStudGuardian(s.guardian_name);
@@ -165,6 +173,8 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         year: studYear,
         semester: (studCourse === 'B.PHARM' || studCourse === 'M.PHARM') ? studSemester : undefined,
         section: studSection,
+        academic_year: studAcademicYear,
+        batch: studBatch,
         phone: studPhone,
         guardian_name: studGuardian,
         department_id: studDeptId,
@@ -235,6 +245,9 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         Year: "I Year",
         Semester: "I Semester",
         Section: "A",
+        "Academic Year": "2024-2025",
+        Batch: "Y24",
+        "Department Code": "PHARM",
         Phone: "9876543210",
         "Guardian Name": "Jane Doe"
       }
@@ -247,7 +260,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
 
   const handleBulkUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadFile || !uploadDeptId) return;
+    if (!uploadFile) return;
 
     setIsUploading(true);
     try {
@@ -267,7 +280,17 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
           const password = row.Password || "Student@123";
           const course = row.Course;
 
-          if (!name || !roll || !course) {
+          const deptCode = row["Department Code"];
+          let finalDeptId = isGlobal ? '' : myDeptId;
+          
+          if (isGlobal && deptCode) {
+            const foundDept = db.getRawState().departments.find(d => d.code.toLowerCase() === String(deptCode).toLowerCase());
+            if (foundDept) {
+              finalDeptId = foundDept.id;
+            }
+          }
+
+          if (!name || !roll || !course || !finalDeptId) {
             errorCount++;
             continue;
           }
@@ -298,7 +321,9 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             year: row.Year ? String(row.Year) : undefined,
             semester: row.Semester ? String(row.Semester) : undefined,
             section: row.Section ? String(row.Section) : undefined,
-            department_id: uploadDeptId,
+            academic_year: row["Academic Year"] ? String(row["Academic Year"]) : undefined,
+            batch: row.Batch ? String(row.Batch) : undefined,
+            department_id: finalDeptId,
             phone: row.Phone ? String(row.Phone) : '',
             guardian_name: row["Guardian Name"] ? String(row["Guardian Name"]) : '',
             user_id: newUser.id,
@@ -636,11 +661,31 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                       <option value="B">Section B</option>
                     </select>
                   </div>
-
                 </div>
               )}
 
-
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Academic Year</label>
+                  <input
+                    type="text"
+                    value={studAcademicYear}
+                    onChange={(e) => setStudAcademicYear(e.target.value)}
+                    placeholder="2024-2025"
+                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Batch</label>
+                  <input
+                    type="text"
+                    value={studBatch}
+                    onChange={(e) => setStudBatch(e.target.value)}
+                    placeholder="Y24"
+                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                  />
+                </div>
+              </div>
 
               <div>
                 <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Phone</label>
@@ -765,23 +810,6 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
               </button>
             </div>
             <form onSubmit={handleBulkUpload} className="p-5 space-y-4">
-              {isGlobal && (
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Target Department</label>
-                  <select
-                    required
-                    disabled={isUploading}
-                    value={uploadDeptId}
-                    onChange={(e) => setUploadDeptId(e.target.value)}
-                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  >
-                    <option value="" disabled>Select Department</option>
-                    {dbState.departments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               <div>
                 <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Upload .xlsx File</label>
@@ -808,7 +836,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={!uploadFile || !uploadDeptId || isUploading}
+                  disabled={!uploadFile || isUploading}
                   className="flex items-center justify-center gap-2 w-full py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-400 disabled:dark:bg-navy-700 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-colors"
                 >
                   {isUploading ? (

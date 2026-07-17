@@ -79,6 +79,8 @@ CREATE TABLE students (
     department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
     phone TEXT NOT NULL,
     guardian_name TEXT NOT NULL,
+    academic_year TEXT,
+    batch TEXT,
     enrollment_date TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

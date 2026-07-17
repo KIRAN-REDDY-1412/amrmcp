@@ -544,6 +544,23 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                 />
               </div>
 
+              {isGlobal && (
+                <div>
+                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Department</label>
+                  <select
+                    required
+                    value={studDeptId}
+                    onChange={(e) => setStudDeptId(e.target.value)}
+                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                  >
+                    <option value="" disabled>Select Department</option>
+                    {dbState.departments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Course</label>
                 <select

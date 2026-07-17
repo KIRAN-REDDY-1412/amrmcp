@@ -247,7 +247,6 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         Section: "A",
         "Academic Year": "2024-2025",
         Batch: "Y24",
-        "Department Code": "PHARM",
         Phone: "9876543210",
         "Guardian Name": "Jane Doe"
       }
@@ -280,14 +279,10 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
           const password = row.Password || "Student@123";
           const course = row.Course;
 
-          const deptCode = row["Department Code"];
           let finalDeptId = isGlobal ? '' : myDeptId;
           
-          if (isGlobal && deptCode) {
-            const foundDept = db.getRawState().departments.find(d => d.code.toLowerCase() === String(deptCode).toLowerCase());
-            if (foundDept) {
-              finalDeptId = foundDept.id;
-            }
+          if (isGlobal && db.getRawState().departments.length > 0) {
+            finalDeptId = db.getRawState().departments[0].id;
           }
 
           if (!name || !roll || !course || !finalDeptId) {

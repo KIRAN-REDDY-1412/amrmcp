@@ -100,7 +100,6 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         phone: studPhone,
         guardian_name: studGuardian,
         user_id: undefined, // Skip user creation
-        department_id: studDeptId,
       });
 
       await db.logAction(
@@ -180,7 +179,6 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         batch: studBatch,
         phone: studPhone,
         guardian_name: studGuardian,
-        department_id: studDeptId,
       });
 
       // Update user email if it exists
@@ -352,7 +350,6 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             section: row.Section ? String(row.Section) : undefined,
             academic_year: row["Academic Year"] ? String(row["Academic Year"]) : undefined,
             batch: row.Batch ? String(row.Batch) : undefined,
-            department_id: finalDeptId || undefined,
             phone: row.Phone ? String(row.Phone) : '',
             guardian_name: row["Guardian Name"] ? String(row["Guardian Name"]) : '',
             user_id: undefined, // Skip user creation per user request and to avoid auth.users FK constraint

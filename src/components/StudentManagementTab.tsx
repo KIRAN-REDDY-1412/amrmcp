@@ -19,6 +19,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
 
   // Form Fields - Student
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [studName, setStudName] = useState('');
   const [studRoll, setStudRoll] = useState('');
   const [studPassword, setStudPassword] = useState('');
@@ -208,13 +209,42 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
   };
 
   const handleDeleteStudent = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete Student ${name}?`)) {
+    if (window.confirm(`Are you sure you want to delete ${name}?`)) {
       try {
         await db.deleteStudent(id);
-        showToast(`Student deleted.`, 'success');
+        await db.logAction(
+          currentUser!.id,
+          currentUser!.email,
+          currentUser!.role,
+          'Delete Student',
+          `Deleted student: ${name}`
+        );
+        showToast(`Student ${name} deleted.`, 'success');
+        setSelectedStudentIds(selectedStudentIds.filter(sid => sid !== id));
         triggerStateRefresh();
       } catch (err: any) {
-        showToast(err.message || 'Failed to delete student.', 'error');
+        showToast(`Deletion failed: ${err.message}`, 'error');
+      }
+    }
+  };
+
+  const handleBulkDeleteStudents = async () => {
+    if (selectedStudentIds.length === 0) return;
+    if (window.confirm(`Are you sure you want to delete ${selectedStudentIds.length} students? This action is irreversible.`)) {
+      try {
+        await db.deleteStudents(selectedStudentIds);
+        await db.logAction(
+          currentUser!.id,
+          currentUser!.email,
+          currentUser!.role,
+          'Bulk Delete Students',
+          `Deleted ${selectedStudentIds.length} students`
+        );
+        showToast(`${selectedStudentIds.length} students deleted.`, 'success');
+        setSelectedStudentIds([]);
+        triggerStateRefresh();
+      } catch (err: any) {
+        showToast(err.message || 'Failed to delete students.', 'error');
       }
     }
   };
@@ -427,6 +457,14 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             >
               <GraduationCap size={16} /> Bulk Promote
             </button>
+            {selectedStudentIds.length > 0 && (
+              <button
+                onClick={handleBulkDeleteStudents}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold shadow-md shadow-red-500/20 transition-colors"
+              >
+                <Trash2 size={16} /> Delete Selected ({selectedStudentIds.length})
+              </button>
+            )}
             <button
               onClick={() => {
                 setStudName('');
@@ -464,6 +502,20 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             <table className="w-full text-left text-sm border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-navy-800 text-navy-400 font-bold text-xs uppercase tracking-wider">
+                  <th className="pb-3 pl-2 w-10">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedStudentIds(visibleStudents.map(s => s.id));
+                        } else {
+                          setSelectedStudentIds([]);
+                        }
+                      }}
+                      checked={visibleStudents.length > 0 && visibleStudents.every(s => selectedStudentIds.includes(s.id))}
+                    />
+                  </th>
                   <th className="pb-3 pl-2">Name</th>
                   <th className="pb-3">Roll Number</th>
                   <th className="pb-3">Program Details</th>
@@ -477,6 +529,20 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
               <tbody className="divide-y divide-slate-100 dark:divide-navy-850 font-medium">
                 {visibleStudents.map((s) => (
                   <tr key={s.id} className="text-navy-900 dark:text-navy-200 hover:bg-slate-50/50 dark:hover:bg-navy-900/30">
+                    <td className="py-3.5 pl-2">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                        checked={selectedStudentIds.includes(s.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedStudentIds([...selectedStudentIds, s.id]);
+                          } else {
+                            setSelectedStudentIds(selectedStudentIds.filter(id => id !== s.id));
+                          }
+                        }}
+                      />
+                    </td>
                     <td className="py-3.5 pl-2 font-bold">{s.name}</td>
                     <td className="py-3.5 text-xs font-mono font-bold text-primary-500">{s.roll_number}</td>
                     <td className="py-3.5">

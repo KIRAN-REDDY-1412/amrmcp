@@ -555,6 +555,27 @@ export class Database {
     return true;
   }
 
+  public async deleteUsers(ids: string[]): Promise<boolean> {
+    if (ids.length === 0) return true;
+    const { error } = await supabase.from('users').delete().in('id', ids);
+    if (error) throw error;
+
+    this.state.principals = this.state.principals.filter((p) => !ids.includes(p.user_id));
+    this.state.hods = this.state.hods.filter((h) => !ids.includes(h.user_id));
+    
+    const facIds = this.state.faculty.filter((f) => ids.includes(f.user_id)).map(f => f.id);
+    if (facIds.length > 0) {
+      this.state.subject_assignments = this.state.subject_assignments.filter((sa) => !facIds.includes(sa.faculty_id));
+      this.state.faculty = this.state.faculty.filter((f) => !ids.includes(f.user_id));
+    }
+    
+    this.state.leave_requests = this.state.leave_requests.filter((lr) => !ids.includes(lr.user_id));
+    this.state.notices = this.state.notices.filter((n) => !ids.includes(n.created_by));
+    this.state.users = this.state.users.filter((u) => !ids.includes(u.id));
+    this.save();
+    return true;
+  }
+
   public async updateUserEmail(id: string, newEmail: string): Promise<User> {
     try {
       const user = this.state.users.find((u) => u.id === id);
@@ -752,6 +773,18 @@ export class Database {
     this.state.attendance = this.state.attendance.filter((a) => a.student_id !== id);
     this.state.marks = this.state.marks.filter((m) => m.student_id !== id);
     this.state.students = this.state.students.filter((s) => s.id !== id);
+    this.save();
+    return true;
+  }
+
+  public async deleteStudents(ids: string[]): Promise<boolean> {
+    if (ids.length === 0) return true;
+    const { error } = await supabase.from('students').delete().in('id', ids);
+    if (error) throw error;
+
+    this.state.attendance = this.state.attendance.filter((a) => !ids.includes(a.student_id));
+    this.state.marks = this.state.marks.filter((m) => !ids.includes(m.student_id));
+    this.state.students = this.state.students.filter((s) => !ids.includes(s.id));
     this.save();
     return true;
   }

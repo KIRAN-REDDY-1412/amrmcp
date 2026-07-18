@@ -384,24 +384,19 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     if (selectedUserIds.length === 0) return;
     if (window.confirm(`Are you sure you want to delete ${selectedUserIds.length} users? This action is irreversible.`)) {
       try {
-        for (const id of selectedUserIds) {
-          const u = dbState.users.find(user => user.id === id);
-          if (u) {
-            await db.deleteUser(id);
-            await db.logAction(
-              currentUser!.id,
-              currentUser!.email,
-              currentUser!.role,
-              'Delete User',
-              `Deleted account for ${u.full_name}`
-            );
-          }
-        }
+        await db.deleteUsers(selectedUserIds);
+        await db.logAction(
+          currentUser!.id,
+          currentUser!.email,
+          currentUser!.role,
+          'Bulk Delete Users',
+          `Deleted ${selectedUserIds.length} user accounts`
+        );
         showToast(`${selectedUserIds.length} user accounts deleted.`, 'success');
         setSelectedUserIds([]);
         triggerStateRefresh();
       } catch (err: any) {
-        showToast(err.message || 'Failed to bulk delete users.', 'error');
+        showToast(err.message || 'Failed to delete users.', 'error');
       }
     }
   };

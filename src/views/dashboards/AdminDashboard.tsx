@@ -413,7 +413,13 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   // --- Bulk Upload Methods ---
   const handleDownloadTemplate = () => {
     let templateData: any[] = [];
-    if (activeTab === 'principals') {
+    if (activeTab === 'administrators') {
+      templateData = [{
+        "Full Name": "Admin User",
+        "Email Address": "admin@example.com",
+        "Password": "Password123!"
+      }];
+    } else if (activeTab === 'principals') {
       templateData = [{
         "Full Name": "Dr. John Doe",
         "Email Address": "john@example.com",
@@ -462,7 +468,9 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
       let errorCount = 0;
       let lastErrorMsg = "";
       
-      let targetRole = 'principal';
+      let targetRole = 'faculty';
+      if (activeTab === 'administrators') targetRole = 'admin';
+      if (activeTab === 'principals') targetRole = 'principal';
       if (activeTab === 'hods') targetRole = 'hod';
       if (activeTab === 'faculty') targetRole = 'faculty';
 
@@ -568,8 +576,8 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     (u) =>
       (u.full_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
         u.email.toLowerCase().includes(searchFilter.toLowerCase())) &&
-      u.role !== 'admin' && // Exclude admin themselves from standard listings
       (activeTab === 'users' || 
+       (activeTab === 'administrators' && u.role === 'admin') ||
        (activeTab === 'principals' && u.role === 'principal') ||
        (activeTab === 'hods' && u.role === 'hod') ||
        (activeTab === 'faculty' && u.role === 'faculty') ||
@@ -814,12 +822,13 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
       )}
 
       {/* 3. USERS MANAGEMENT TAB */}
-      {(activeTab === 'users' || activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty' || activeTab === 'library' || activeTab === 'exam_cell') && (
-        <div className="glass p-6 rounded-2xl border border-navy-100 dark:border-navy-800 space-y-6 animate-fade-in">
-          <div className="flex justify-between items-center">
+      {(activeTab === 'users' || activeTab === 'administrators' || activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty' || activeTab === 'library' || activeTab === 'exam_cell') && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-navy-900/60 p-4 rounded-xl border border-slate-200 dark:border-navy-800 shadow-sm">
             <div>
-              <h3 className="text-navy-900 dark:text-white font-bold text-lg">
-                {activeTab === 'principals' ? 'Principal Management' : 
+              <h3 className="text-lg font-bold text-navy-900 dark:text-white">
+                {activeTab === 'administrators' ? 'Administrator Management' :
+                 activeTab === 'principals' ? 'Principal Management' : 
                  activeTab === 'hods' ? 'HOD Management' : 
                  activeTab === 'faculty' ? 'Faculty Management' : 
                  activeTab === 'library' ? 'Library Management' : 
@@ -828,8 +837,8 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
               </h3>
               <p className="text-xs text-navy-400">Manage login credentials and system-wide roles</p>
             </div>
-            <div className="flex gap-2">
-              {(activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty') && (
+            <div className="flex flex-wrap gap-2">
+              {(activeTab === 'administrators' || activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty') && (
                 <>
                   <button 
                     onClick={handleDownloadTemplate}
@@ -858,9 +867,11 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
               )}
               <button
                 onClick={() => {
-                  let defaultRole = 'principal';
+                  setIsAssignExisting(false);
+                  let defaultRole = 'faculty';
+                  if (activeTab === 'administrators') defaultRole = 'admin';
+                  if (activeTab === 'principals') defaultRole = 'principal';
                   if (activeTab === 'hods') defaultRole = 'hod';
-                  if (activeTab === 'faculty') defaultRole = 'faculty';
                   if (activeTab === 'library') defaultRole = 'library';
                   if (activeTab === 'exam_cell') defaultRole = 'exam_cell';
                   setUserRole(defaultRole as any);
@@ -936,6 +947,8 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                               ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400'
                               : u.role === 'hod'
                               ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                              : u.role === 'admin'
+                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
                               : 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-400'
                           }`}>
                             {u.role}
@@ -1265,10 +1278,11 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                     <select
                       value={userRole}
                       onChange={(e) => setUserRole(e.target.value as any)}
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                      className="mt-1.5 block w-full rounded-xl border border-slate-200 dark:border-navy-800 bg-white dark:bg-navy-950 px-4 py-2.5 text-navy-900 dark:text-white focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                     >
-                      {(activeTab === 'users' || activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty') && (
+                      {(activeTab === 'users' || activeTab === 'administrators' || activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty') && (
                         <>
+                          <option value="admin">Administrator</option>
                           <option value="principal">Principal</option>
                           <option value="hod">HOD</option>
                           <option value="faculty">Faculty</option>

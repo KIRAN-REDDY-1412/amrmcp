@@ -125,6 +125,7 @@ export const DashboardContainer: React.FC = () => {
           label: 'User Management', 
           icon: UserCheck,
           subLinks: [
+            { id: 'administrators', label: 'Administrator Management' },
             { id: 'principals', label: 'Principal Management' },
             { id: 'hods', label: 'HOD Management' },
             { id: 'faculty', label: 'Faculty Management' },

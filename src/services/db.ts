@@ -316,10 +316,8 @@ export class Database {
     };
 
     const mergeArrays = (local: any[], remote: any[] | null) => {
-      if (!remote) return local;
-      const remoteIds = new Set(remote.map(r => r.id));
-      const localOnly = local.filter(l => !remoteIds.has(l.id));
-      return [...remote, ...localOnly];
+      if (!remote) return local; // keep local only if fetch completely failed (e.g., no internet)
+      return remote; // remote is the absolute source of truth
     };
 
     try {

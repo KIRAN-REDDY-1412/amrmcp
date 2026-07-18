@@ -86,16 +86,6 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
     }
 
     try {
-      // Create user auth record first
-      const studentEmail = studEmail || `${studRoll.toLowerCase()}@student.amreddy.edu`;
-      const newUser = await db.createUser({
-        email: studentEmail,
-        password: studPassword || 'Student@123',
-        role: 'student',
-        full_name: studName,
-        is_active: true,
-      });
-
       await db.createStudent({
         name: studName,
         roll_number: studRoll,
@@ -109,7 +99,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         batch: studBatch,
         phone: studPhone,
         guardian_name: studGuardian,
-        user_id: newUser.id,
+        user_id: undefined, // Skip user creation
         department_id: studDeptId,
       });
 
@@ -351,15 +341,6 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             continue;
           }
 
-          const studentEmail = row.Email || `${String(roll).toLowerCase()}@student.amreddy.edu`;
-          const newUser = await db.createUser({
-            email: studentEmail,
-            password: String(password),
-            role: 'student',
-            full_name: String(name),
-            is_active: true,
-          });
-
           await db.createStudent({
             name: String(name),
             roll_number: String(roll),
@@ -374,7 +355,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             department_id: finalDeptId || undefined,
             phone: row.Phone ? String(row.Phone) : '',
             guardian_name: row["Guardian Name"] ? String(row["Guardian Name"]) : '',
-            user_id: newUser.id,
+            user_id: undefined, // Skip user creation per user request and to avoid auth.users FK constraint
           });
 
           successCount++;

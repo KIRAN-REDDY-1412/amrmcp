@@ -106,7 +106,6 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         section: studSection,
         academic_year: studAcademicYear,
         batch: studBatch,
-        department_id: studDeptId || undefined,
         phone: studPhone,
         guardian_name: studGuardian,
         user_id: newUser.id,
@@ -189,7 +188,6 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         batch: studBatch,
         phone: studPhone,
         guardian_name: studGuardian,
-        department_id: studDeptId || undefined,
       });
 
       // Update user email if it exists
@@ -541,7 +539,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                 <X size={18} />
               </button>
             </div>
-            <form onSubmit={activeModal === 'create_student' ? handleCreateStudent : handleUpdateStudent} className="p-5 space-y-4">
+            <form onSubmit={activeModal === 'create_student' ? handleCreateStudent : handleUpdateStudent} className="p-5 space-y-4 overflow-y-auto max-h-[75vh]">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Student Name</label>

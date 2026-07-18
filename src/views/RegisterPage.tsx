@@ -83,6 +83,9 @@ export const RegisterPage: React.FC = () => {
         phone,
         guardian_name: guardianName,
         user_id: newUser.id,
+        status: 'ERP Account Active',
+        admission_quota: 'Convenor',
+        gender: 'Male'
       });
 
       showToast('Registration successful! You can now log in.', 'success');

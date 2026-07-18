@@ -56,20 +56,59 @@ export interface Faculty {
 export interface Student {
   id: string;
   user_id?: string;
+  status: 'Draft' | 'Documents Pending' | 'Documents Uploaded' | 'Verified' | 'Admission Approved' | 'Roll Number Pending' | 'Roll Number Assigned' | 'ERP Registration Pending' | 'ERP Account Active';
+  
+  // Admission Info
+  course: string;
+  admission_quota: 'Convenor' | 'Management' | 'Spot';
+  roll_number?: string;
+  
+  // Personal Info
   name: string;
-  roll_number: string;
+  photo_url?: string;
+  gender: 'Male' | 'Female' | 'Other';
   dob?: string;
-  course?: string; // e.g. "B.PHARM"
-  branch?: string; // Nullable, used for M.Pharm
+  phone: string;
+  email?: string;
+  aadhaar_number?: string;
+  nationality?: string;
+  religion?: string;
+  caste?: string;
+  sub_caste?: string;
+  mole_1?: string;
+  mole_2?: string;
+  address?: string;
+  
+  // Parent Info
+  father_name?: string;
+  mother_name?: string;
+  parent_phone?: string;
+  parent_email?: string;
+  father_occupation?: string;
+  father_aadhaar?: string;
+  mother_aadhaar?: string;
+  guardian_name?: string;
+
+  // Academic Info
+  department_id?: string;
+  branch?: string;
   year?: string;
-  semester?: string; // Nullable, not used for Pharm.D
-  section?: string; // e.g. A, B, C, D
+  semester?: string;
+  section?: string;
   academic_year?: string;
   batch?: string;
-  department_id?: string;
-  phone: string;
-  guardian_name: string;
+  mentor_id?: string;
+  
   enrollment_date: string;
+}
+
+export interface AdmissionDocument {
+  id: string;
+  student_id: string;
+  document_type: string;
+  file_data: string;
+  status: 'Pending' | 'Verified' | 'Rejected';
+  uploaded_at: string;
 }
 
 export interface Subject {
@@ -187,6 +226,7 @@ export interface DatabaseState {
   hods: HOD[];
   faculty: Faculty[];
   students: Student[];
+  admission_documents: AdmissionDocument[];
   subjects: Subject[];
   subject_assignments: SubjectAssignment[];
   timetable: TimetableSlot[];
@@ -204,6 +244,7 @@ const EMPTY_STATE: DatabaseState = {
   hods: [],
   faculty: [],
   students: [],
+  admission_documents: [],
   subjects: [],
   subject_assignments: [],
   timetable: [],
@@ -360,6 +401,7 @@ export class Database {
         hods: mergeArrays(this.state.hods, hods),
         faculty: mergeArrays(this.state.faculty, faculty),
         students: mergeArrays(this.state.students, students),
+        admission_documents: mergeArrays(this.state.admission_documents, []), // or fetch them if added to fetchTable
         subjects: mergeArrays(this.state.subjects, subjects),
         subject_assignments: mergeArrays(this.state.subject_assignments, subject_assignments),
         timetable: mergeArrays(this.state.timetable, timetable),
@@ -671,8 +713,53 @@ export class Database {
   }
 
   // --- Departments ---
-  public getDepartments(): Department[] {
+  public getDepartments() {
     return this.state.departments;
+  }
+
+  public getAdmissionDocuments(studentId?: string) {
+    if (studentId) {
+      return this.state.admission_documents.filter(d => d.student_id === studentId);
+    }
+    return this.state.admission_documents;
+  }
+
+  public async updateAdmissionDocumentStatus(docId: string, status: 'Verified' | 'Rejected') {
+    const docIndex = this.state.admission_documents.findIndex(d => d.id === docId);
+    if (docIndex === -1) return;
+
+    // Update in Supabase
+    const { error } = await supabase
+      .from('admission_documents')
+      .update({ status })
+      .eq('id', docId);
+
+    if (error) {
+      console.error("Error updating document status in Supabase", error);
+      throw error;
+    }
+
+    // Update locally
+    this.state.admission_documents[docIndex].status = status;
+    this.save();
+  }
+
+  public async updateStudentStatus(studentId: string, status: string) {
+    const sIndex = this.state.students.findIndex(s => s.id === studentId);
+    if (sIndex === -1) return;
+
+    const { error } = await supabase
+      .from('students')
+      .update({ status })
+      .eq('id', studentId);
+
+    if (error) {
+      console.error("Error updating student status in Supabase", error);
+      throw error;
+    }
+
+    this.state.students[sIndex].status = status as any;
+    this.save();
   }
 
   public getDepartmentById(id: string): Department | undefined {
@@ -786,6 +873,48 @@ export class Database {
     this.state.marks = this.state.marks.filter((m) => !ids.includes(m.student_id));
     this.state.students = this.state.students.filter((s) => !ids.includes(s.id));
     this.save();
+    return true;
+  }
+
+  public async registerStudentToERP(studentId: string, customPassword?: string): Promise<boolean> {
+    const student = this.state.students.find(s => s.id === studentId);
+    if (!student) throw new Error('Student not found');
+    if (!student.roll_number) throw new Error('Student must have a Roll Number before ERP registration');
+    if (student.status === 'ERP Account Active') throw new Error('Student is already registered');
+    
+    const tempEmail = `${student.roll_number.toLowerCase()}@student.amreddy.edu`;
+    const tempPassword = customPassword || 'Student@123';
+
+    // 1. Create auth user
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: tempEmail,
+      password: tempPassword,
+      options: { data: { full_name: student.name, role: 'student' } }
+    });
+    
+    if (authError) throw authError;
+    if (!authData.user) throw new Error("Auth user creation failed");
+    
+    // 2. Add to public.users
+    const { error: userError } = await supabase.from('users').insert({
+      id: authData.user.id,
+      email: tempEmail,
+      role: 'student',
+      full_name: student.name,
+      is_active: true
+    });
+    if (userError) throw userError;
+
+    // 3. Link to student and change status
+    const { error: updateError } = await supabase.from('students').update({
+      user_id: authData.user.id,
+      status: 'ERP Account Active',
+      email: tempEmail // Also set their contact email to the college one if needed
+    }).eq('id', student.id);
+
+    if (updateError) throw updateError;
+    
+    await this.syncWithSupabase();
     return true;
   }
 

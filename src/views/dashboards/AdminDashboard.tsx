@@ -65,12 +65,13 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [deptDesc, setDeptDesc] = useState('');
 
   // Form Fields - Users
+  const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
-  const [userFullName, setUserFullName] = useState('');
   const [userPassword, setUserPassword] = useState('');
-  const [userRole, setUserRole] = useState<'principal' | 'hod' | 'faculty' | 'exam_cell' | 'library'>('principal');
+  const [userRole, setUserRole] = useState<'admin' | 'principal' | 'hod' | 'faculty' | 'library' | 'exam_cell' | 'admission_cell' | 'student'>('faculty');
   const [isAssignExisting, setIsAssignExisting] = useState(false);
   const [assignUserId, setAssignUserId] = useState('');
+  const [existingUserId, setExistingUserId] = useState('');
   const [userDeptId, setUserDeptId] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [userQual, setUserQual] = useState('');
@@ -222,6 +223,39 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (userRole === 'student') {
+      if (!userName || !userPassword) {
+        showToast('Please enter both roll number and password.', 'warning');
+        return;
+      }
+      
+      const student = dbState.students.find(s => s.roll_number?.toLowerCase() === userName.toLowerCase());
+      if (!student) {
+        showToast('Student with this roll number not found. Ensure Admission Cell has added them.', 'error');
+        return;
+      }
+      if (student.status === 'ERP Account Active') {
+        showToast('This student is already registered in the ERP.', 'info');
+        return;
+      }
+      try {
+        await db.registerStudentToERP(student.id, userPassword);
+        await db.logAction(
+          currentUser!.id,
+          currentUser!.email,
+          currentUser!.role,
+          'Register Student ERP',
+          `Activated ERP account for Roll: ${userName}`
+        );
+        showToast(`Student ERP Account activated for ${student.name}`, 'success');
+        setActiveModal(null);
+        triggerStateRefresh();
+      } catch (err: any) {
+        showToast(err.message || 'Failed to register student to ERP.', 'error');
+      }
+      return;
+    }
+
     if (isAssignExisting) {
       if (!assignUserId || !userRole) {
         showToast('Please select a user and role to assign.', 'warning');
@@ -246,7 +280,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
       return;
     }
 
-    if (!userEmail || !userFullName || !userPassword) return;
+    if (!userEmail || !userName || !userPassword) return;
 
     // Check email uniqueness
     const emailExists = db.getUsers().some((u) => u.email.toLowerCase() === userEmail.toLowerCase());
@@ -267,7 +301,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
         email: userEmail,
         password: userPassword,
         role: userRole,
-        full_name: userFullName,
+        full_name: userName,
         is_active: true,
       });
 
@@ -304,17 +338,17 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
         currentUser!.email,
         currentUser!.role,
         'Create User',
-        `Registered user: ${userFullName} (${userRole.toUpperCase()})`
+        `Registered user: ${userName} (${userRole.toUpperCase()})`
       );
-      showToast(`User account created for ${userFullName}.`, 'success');
+      showToast(`User account created for ${userName}.`, 'success');
       setActiveModal(null);
       triggerStateRefresh();
       
       // Clear Fields
       setUserEmail('');
-      setUserFullName('');
+      setUserName('');
       setUserPassword('');
-      setUserRole('principal');
+      setUserRole('faculty');
       setUserDeptId('');
       setUserPhone('');
       setUserQual('');
@@ -588,7 +622,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const filteredStudents = dbState.students.filter(
     (s) =>
       s.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      s.roll_number.toLowerCase().includes(searchFilter.toLowerCase())
+      (s.roll_number && s.roll_number.toLowerCase().includes(searchFilter.toLowerCase()))
   );
 
   // Pagination variables
@@ -1147,6 +1181,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                 {activeModal === 'edit_dept' && 'Modify Department'}
                 {activeModal === 'create_user' && 'Register Staff User'}
                 {activeModal === 'reset_password' && 'Perform Password Override'}
+                {activeModal === 'register_student_erp' && 'Activate Student ERP'}
                 {activeModal === 'create_student' && 'Register Student Profile'}
                 {activeModal === 'edit_student' && 'Modify Student Record'}
                 {activeModal === 'view_users' && (viewRole === 'principal' ? 'Principals' : viewRole === 'hod' ? 'Head of Departments' : 'Faculty')}
@@ -1291,6 +1326,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                       {(activeTab === 'users' || activeTab === 'library') && <option value="library">Library</option>}
                       {(activeTab === 'users' || activeTab === 'exam_cell') && <option value="exam_cell">Exam Cell</option>}
                       {(activeTab === 'users' || activeTab === 'admission_cell') && <option value="admission_cell">Admission Cell</option>}
+                      {activeTab === 'users' && <option value="student">Student</option>}
                     </select>
                   </div>
                   {/* Department Field (Conditional for HOD & Faculty) */}
@@ -1314,33 +1350,79 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={userFullName}
-                    onChange={(e) => setUserFullName(e.target.value)}
-                    placeholder="Dr. John Doe"
-                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    value={userEmail}
-                    onChange={(e) => setUserEmail(e.target.value)}
-                    placeholder="email@amreddy.edu"
-                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  />
-                </div>
-
-                {!isAssignExisting && (
+                {isAssignExisting && userRole !== 'student' ? (
+                  <div className="mt-4">
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Select User</label>
+                    <select
+                      required
+                      value={existingUserId}
+                      onChange={(e) => setExistingUserId(e.target.value)}
+                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                    >
+                      <option value="">-- Select Existing User --</option>
+                      {dbState.users
+                        .filter((u) => u.role !== userRole)
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.full_name} ({u.email}) - Current: {u.role}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                ) : userRole === 'student' ? (
                   <>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Roll Number</label>
+                        <input
+                          type="text"
+                          required
+                          value={userName}
+                          onChange={(e) => setUserName(e.target.value)}
+                          placeholder="Enter Roll No."
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Password</label>
+                        <input
+                          type="text"
+                          required
+                          value={userPassword}
+                          onChange={(e) => setUserPassword(e.target.value)}
+                          placeholder="e.g. Student@123"
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mt-4">
+                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Full Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={userName}
+                        onChange={(e) => setUserName(e.target.value)}
+                        placeholder="Dr. John Doe"
+                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Email Address</label>
+                      <input
+                        type="email"
+                        required
+                        value={userEmail}
+                        onChange={(e) => setUserEmail(e.target.value)}
+                        placeholder="email@amreddy.edu"
+                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-4">
                       <div>
                         <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Password</label>
                         <input
@@ -1364,7 +1446,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 mt-4">
                       <div>
                         <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Phone</label>
                         <input
@@ -1375,6 +1457,19 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                           className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
                         />
                       </div>
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Specialization</label>
+                        <input
+                          type="text"
+                          value={userSpec}
+                          onChange={(e) => setUserSpec(e.target.value)}
+                          placeholder="e.g. Pharmaceutics"
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
                       {userRole === 'faculty' && (
                         <div>
                           <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Designation</label>

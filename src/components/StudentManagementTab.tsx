@@ -77,60 +77,43 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studName || !studRoll) return;
+    if (!studRoll || !studPassword) {
+      showToast('Please enter both roll number and password.', 'warning');
+      return;
+    }
 
-    const rollExists = dbState.students.some((s) => s.roll_number.toLowerCase() === studRoll.toLowerCase());
-    if (rollExists) {
-      showToast('Roll number already exists.', 'error');
+    const student = dbState.students.find(
+      (s) => s.roll_number && s.roll_number.toLowerCase() === studRoll.toLowerCase()
+    );
+
+    if (!student) {
+      showToast('Student with this roll number not found. Ensure Admission Cell has added them.', 'error');
+      return;
+    }
+
+    if (student.status === 'ERP Account Active') {
+      showToast('This student is already registered in the ERP.', 'info');
       return;
     }
 
     try {
-      await db.createStudent({
-        name: studName,
-        roll_number: studRoll,
-        dob: studDob,
-        course: studCourse,
-        branch: studCourse === 'M.PHARM' ? studBranch : undefined,
-        year: studYear,
-        semester: (studCourse === 'B.PHARM' || studCourse === 'M.PHARM') ? studSemester : undefined,
-        section: studSection,
-        academic_year: studAcademicYear,
-        batch: studBatch,
-        phone: studPhone,
-        guardian_name: studGuardian,
-        user_id: undefined, // Skip user creation
-      });
-
+      await db.registerStudentToERP(student.id, studPassword);
       await db.logAction(
         currentUser.id,
         currentUser.email,
         currentUser.role,
-        'Create Student',
-        `Registered student: ${studName} (Roll: ${studRoll})`
+        'Register Student ERP',
+        `Activated ERP account for Roll: ${studRoll}`
       );
-      showToast(`Student ${studName} registered.`, 'success');
+      showToast(`ERP Account activated for ${student.name}`, 'success');
       setActiveModal(null);
       triggerStateRefresh();
 
       // Clear
-      setStudName('');
       setStudRoll('');
       setStudPassword('');
-      setStudDob('');
-      setStudCourse('');
-      setStudBranch('');
-      setStudYear('');
-      setStudSemester('');
-      setStudSection('');
-      setStudAcademicYear('');
-      setStudBatch('');
-      setStudDeptId('');
-      setStudPhone('');
-      setStudEmail('');
-      setStudGuardian('');
     } catch (err: any) {
-      console.error("Student Reg Error:", err);
+      console.error("Student ERP Reg Error:", err);
       showToast(`Registration failed: ${err.message || 'Unknown error'}`, 'error');
     }
   };
@@ -138,7 +121,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
   const handleEditStudentOpen = (s: Student) => {
     setSelectedStudentId(s.id);
     setStudName(s.name);
-    setStudRoll(s.roll_number);
+    setStudRoll(s.roll_number || '');
     setStudDob(s.dob || '');
     setStudCourse(s.course || '');
     setStudBranch(s.branch || '');
@@ -154,7 +137,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
     const studentUser = dbState.users.find(u => u.id === s.user_id);
     setStudEmail(studentUser?.email || '');
     
-    setStudGuardian(s.guardian_name);
+    setStudGuardian(s.guardian_name || '');
     setActiveModal('edit_student');
   };
 
@@ -233,6 +216,25 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         triggerStateRefresh();
       } catch (err: any) {
         showToast(err.message || 'Failed to delete students.', 'error');
+      }
+    }
+  };
+
+  const handleRegisterERP = async (id: string) => {
+    if (window.confirm("Are you sure you want to register this student to the ERP? This will create their login credentials.")) {
+      try {
+        await db.registerStudentToERP(id);
+        await db.logAction(
+          currentUser!.id,
+          currentUser!.email,
+          currentUser!.role,
+          'ERP Registration',
+          `Registered student ${id} to ERP`
+        );
+        showToast('Student successfully registered to ERP.', 'success');
+        triggerStateRefresh();
+      } catch (err: any) {
+        showToast(err.message || 'Failed to register student to ERP.', 'error');
       }
     }
   };
@@ -331,7 +333,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
           }
 
           const rollExists = db.getRawState().students.some(
-            (s) => s.roll_number.toLowerCase() === String(roll).toLowerCase()
+            (s) => s.roll_number && s.roll_number.toLowerCase() === String(roll).toLowerCase()
           );
           
           if (rollExists) {
@@ -350,9 +352,12 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             section: row.Section ? String(row.Section) : undefined,
             academic_year: row["Academic Year"] ? String(row["Academic Year"]) : undefined,
             batch: row.Batch ? String(row.Batch) : undefined,
-            phone: row.Phone ? String(row.Phone) : '',
-            guardian_name: row["Guardian Name"] ? String(row["Guardian Name"]) : '',
-            user_id: undefined, // Skip user creation per user request and to avoid auth.users FK constraint
+            phone: row.Phone ? String(row.Phone) : "",
+            guardian_name: row["Guardian Name"] ? String(row["Guardian Name"]) : "",
+            user_id: undefined,
+            status: 'Draft',
+            admission_quota: 'Convenor',
+            gender: 'Male'
           });
 
           successCount++;
@@ -391,9 +396,14 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
   };
 
   const visibleStudents = dbState.students.filter(
-    (s) =>
-      s.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      s.roll_number.toLowerCase().includes(searchFilter.toLowerCase())
+    (s) => {
+      const matchesSearch = s.name.toLowerCase().includes(searchFilter.toLowerCase()) || (s.roll_number && s.roll_number.toLowerCase().includes(searchFilter.toLowerCase()));
+      // If admin/principal, show students who have at least been assigned a roll number
+      if (isGlobal) {
+        return matchesSearch && ['Roll Number Assigned', 'ERP Registration Pending', 'ERP Account Active'].includes(s.status);
+      }
+      return matchesSearch;
+    }
   );
 
   const getDeptName = (id: string) => {
@@ -443,27 +453,6 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                 <Trash2 size={16} /> Delete Selected ({selectedStudentIds.length})
               </button>
             )}
-            <button
-              onClick={() => {
-                setStudName('');
-                setStudRoll('');
-                setStudPassword('');
-                setStudDob('');
-                setStudCourse('');
-                setStudBranch('');
-                setStudYear('');
-                setStudSemester('');
-                setStudSection('');
-                setStudPhone('');
-                setStudEmail('');
-                setStudGuardian('');
-                setStudDeptId(isGlobal ? '' : myDeptId);
-                setActiveModal('create_student');
-              }}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-bold shadow-md shadow-primary-500/20"
-            >
-              <Plus size={16} /> Register Student
-            </button>
           </div>
         </div>
 
@@ -498,7 +487,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                   <th className="pb-3">Roll Number</th>
                   <th className="pb-3">Program Details</th>
                   <th className="pb-3">Batch Info</th>
-                  <th className="pb-3">DOB</th>
+                  <th className="pb-3">Status</th>
                   <th className="pb-3">Contact & Credentials</th>
                   <th className="pb-3">Guardian</th>
                   <th className="pb-3 pr-2 text-right">Actions</th>
@@ -539,16 +528,28 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                         <span className="text-[10px] text-navy-500">{s.academic_year || 'N/A'}</span>
                       </div>
                     </td>
-                    <td className="py-3.5 text-xs text-navy-450">{s.dob || 'N/A'}</td>
+                    <td className="py-3.5">
+                      <span className={`px-2 py-1 rounded text-[10px] font-bold ${s.status === 'ERP Account Active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {s.status}
+                      </span>
+                    </td>
                     <td className="py-3.5">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-xs text-navy-900 dark:text-navy-200" title="Phone">📞 {s.phone || 'N/A'}</span>
                         <span className="text-[10px] text-navy-500" title="Email">✉️ {dbState.users.find(u => u.id === s.user_id)?.email || 'N/A'}</span>
-                        <span className="text-[10px] text-navy-500 font-mono" title="Password">🔑 {dbState.users.find(u => u.id === s.user_id)?.password || '••••••••'}</span>
+                        {s.status === 'ERP Account Active' && <span className="text-[10px] text-navy-500 font-mono" title="Password">🔑 ••••••••</span>}
                       </div>
                     </td>
-                    <td className="py-3.5 text-xs text-navy-500">{s.guardian_name || 'N/A'}</td>
+                    <td className="py-3.5 text-xs text-navy-500">{s.guardian_name || s.father_name || 'N/A'}</td>
                     <td className="py-3.5 pr-2 text-right space-x-2">
+                      {isGlobal && s.status !== 'ERP Account Active' && (
+                        <button
+                          onClick={() => handleRegisterERP(s.id)}
+                          className="px-2 py-1 bg-primary-600 hover:bg-primary-700 text-white rounded text-[10px] font-bold mr-2"
+                        >
+                          Register to ERP
+                        </button>
+                      )}
                       <button
                         onClick={() => handleEditStudentOpen(s)}
                         className="p-1.5 text-navy-400 hover:text-primary-500 hover:bg-slate-100 dark:hover:bg-navy-850 rounded-lg transition-colors"
@@ -578,244 +579,54 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
               <h3 className="font-bold text-navy-900 dark:text-white">
                 {activeModal === 'create_student' ? 'Register New Student' : 'Edit Student Details'}
               </h3>
-              <button
-                onClick={() => setActiveModal(null)}
-                className="text-navy-400 hover:text-navy-600 dark:hover:text-navy-200 transition-colors"
-              >
-                <X size={18} />
+              <button onClick={() => setActiveModal(null)} className="p-2 text-navy-400 hover:text-navy-600 dark:hover:text-white hover:bg-white dark:hover:bg-navy-800 rounded-full transition-colors">
+                <X size={20} />
               </button>
             </div>
-            <form onSubmit={activeModal === 'create_student' ? handleCreateStudent : handleUpdateStudent} className="p-5 space-y-4 overflow-y-auto max-h-[75vh]">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Student Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={studName}
-                    onChange={(e) => setStudName(e.target.value)}
-                    placeholder="e.g. Alice Doe"
-                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  />
+            
+            <form onSubmit={handleUpdateStudent} className="p-5 space-y-4 overflow-y-auto max-h-[75vh]">
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Full Name *</label>
+                    <input type="text" required value={studName} onChange={(e) => setStudName(e.target.value)} className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Date of Birth</label>
+                    <input type="date" value={studDob} onChange={(e) => setStudDob(e.target.value)} className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white" />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Roll Number (User ID)</label>
-                  <input
-                    type="text"
-                    required
-                    disabled={activeModal === 'edit_student'}
-                    value={studRoll}
-                    onChange={(e) => setStudRoll(e.target.value)}
-                    placeholder="Y26PH001"
-                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white font-mono disabled:opacity-50"
-                  />
-                </div>
-              </div>
-
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">
-                    {activeModal === 'edit_student' ? 'Reset Password (Optional)' : 'Login Password'}
-                  </label>
-                  <input
-                    type="password"
-                    required={activeModal === 'create_student'}
-                    value={studPassword}
-                    onChange={(e) => setStudPassword(e.target.value)}
-                    placeholder={activeModal === 'edit_student' ? "Leave blank to keep unchanged" : "••••••••"}
-                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Date of Birth</label>
-                  <input
-                    type="date"
-                    value={studDob}
-                    onChange={(e) => setStudDob(e.target.value)}
-                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-
-              <div>
-                <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Course</label>
-                <select
-                  required
-                  value={studCourse}
-                  onChange={(e) => {
-                    setStudCourse(e.target.value);
-                    setStudBranch('');
-                    setStudYear('');
-                    setStudSemester('');
-                    setStudSection('');
-                  }}
-                  className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                >
-                  <option value="" disabled>Select a course</option>
-                  <option value="B.PHARM">B.PHARM</option>
-                  <option value="M.PHARM">M.PHARM</option>
-                  <option value="PHARM.D">PHARM.D</option>
-                </select>
-              </div>
-
-              {/* Dynamic Fields based on Course Selection */}
-              {studCourse && (
-                <div className="grid grid-cols-2 gap-3 animate-fade-in transition-all duration-300 origin-top">
-                  
-                  {/* Branch - M.PHARM only */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Course *</label>
+                    <select required value={studCourse} onChange={(e) => setStudCourse(e.target.value)} className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white">
+                      <option value="">-- Select --</option>
+                      <option value="B.PHARM">B.Pharm</option>
+                      <option value="M.PHARM">M.Pharm</option>
+                      <option value="PHARM.D">Pharm.D</option>
+                    </select>
+                  </div>
                   {studCourse === 'M.PHARM' && (
-                    <div className="col-span-2">
-                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Branch</label>
-                      <select
-                        required
-                        value={studBranch}
-                        onChange={(e) => setStudBranch(e.target.value)}
-                        className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                      >
-                        <option value="" disabled>Select Branch</option>
-                        <option value="Regulatory Affairs">Regulatory Affairs</option>
-                        <option value="Pharmaceutical Analysis">Pharmaceutical Analysis</option>
-                        <option value="Pharmacology">Pharmacology</option>
+                    <div>
+                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Branch *</label>
+                      <select required value={studBranch} onChange={(e) => setStudBranch(e.target.value)} className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white">
+                        <option value="">-- Select --</option>
                         <option value="Pharmaceutics">Pharmaceutics</option>
+                        <option value="Pharmacology">Pharmacology</option>
+                        <option value="Pharmaceutical Analysis">Pharmaceutical Analysis</option>
+                        <option value="Industrial Pharmacy">Industrial Pharmacy</option>
                       </select>
                     </div>
                   )}
-
-                  {/* Year Dropdown */}
-                  <div className={studCourse === 'B.PHARM' || studCourse === 'M.PHARM' ? "col-span-1" : "col-span-2"}>
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Year</label>
-                    <select
-                      required
-                      value={studYear}
-                      onChange={(e) => setStudYear(e.target.value)}
-                      className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                    >
-                      <option value="" disabled>Select Year</option>
-                      <option value="I Year">I Year</option>
-                      <option value="II Year">II Year</option>
-                      {(studCourse === 'B.PHARM' || studCourse === 'PHARM.D') && (
-                        <>
-                          <option value="III Year">III Year</option>
-                          <option value="IV Year">IV Year</option>
-                        </>
-                      )}
-                      {studCourse === 'PHARM.D' && (
-                        <>
-                          <option value="V Year">V Year</option>
-                          <option value="VI Year">VI Year</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-
-                  {/* Semester Dropdown - Only for B.PHARM and M.PHARM */}
-                  {(studCourse === 'B.PHARM' || studCourse === 'M.PHARM') && (
-                    <div className="col-span-1">
-                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Semester</label>
-                      <select
-                        required
-                        value={studSemester}
-                        onChange={(e) => setStudSemester(e.target.value)}
-                        className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                      >
-                        <option value="" disabled>Select Semester</option>
-                        <option value="I Semester">I Semester</option>
-                        <option value="II Semester">II Semester</option>
-                        <option value="III Semester">III Semester</option>
-                        <option value="IV Semester">IV Semester</option>
-                        {studCourse === 'B.PHARM' && (
-                          <>
-                            <option value="V Semester">V Semester</option>
-                            <option value="VI Semester">VI Semester</option>
-                            <option value="VII Semester">VII Semester</option>
-                            <option value="VIII Semester">VIII Semester</option>
-                          </>
-                        )}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Section Dropdown */}
-                  <div className={(studCourse === 'B.PHARM' || studCourse === 'M.PHARM') ? "col-span-1" : "col-span-2"}>
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Section</label>
-                    <select
-                      required
-                      value={studSection}
-                      onChange={(e) => setStudSection(e.target.value)}
-                      className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                    >
-                      <option value="" disabled>Select Section</option>
-                      <option value="A">Section A</option>
-                      <option value="B">Section B</option>
-                    </select>
-                  </div>
                 </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Academic Year</label>
-                  <input
-                    type="text"
-                    value={studAcademicYear}
-                    onChange={(e) => setStudAcademicYear(e.target.value)}
-                    placeholder="2024-2025"
-                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  />
+                <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-navy-800 mt-6">
+                  <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 text-sm font-bold text-navy-600 dark:text-navy-300 hover:bg-slate-100 dark:hover:bg-navy-800 rounded-xl transition-colors">
+                    Cancel
+                  </button>
+                  <button type="submit" className="px-5 py-2 text-sm font-bold bg-primary-600 hover:bg-primary-700 text-white rounded-xl shadow-md shadow-primary-500/20 transition-all active:scale-95">
+                    Save Changes
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Batch</label>
-                  <input
-                    type="text"
-                    value={studBatch}
-                    onChange={(e) => setStudBatch(e.target.value)}
-                    placeholder="Y24"
-                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Email</label>
-                <input
-                  type="email"
-                  value={studEmail}
-                  onChange={(e) => setStudEmail(e.target.value)}
-                  placeholder="e.g. alice@example.com"
-                  className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Phone</label>
-                <input
-                  type="text"
-                  value={studPhone}
-                  onChange={(e) => setStudPhone(e.target.value)}
-                  placeholder="9876543210"
-                  className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Guardian Name</label>
-                <input
-                  type="text"
-                  value={studGuardian}
-                  onChange={(e) => setStudGuardian(e.target.value)}
-                  placeholder="Father's Name"
-                  className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                />
-              </div>
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm transition-colors"
-                >
-                  {activeModal === 'create_student' ? 'Register Profile' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
+              </form>
           </div>
         </div>
       )}

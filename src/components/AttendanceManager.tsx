@@ -149,7 +149,7 @@ export const AttendanceManager: React.FC<Props> = ({ isReadOnly = false, canEdit
         // Handle New Creation Workflow
         const recordsToSave = students.map(student => ({
           student_id: student.id,
-          roll_number: student.roll_number,
+          roll_number: student.roll_number || '',
           faculty_id: currentUser?.id || '',
           subject_id: subjectId,
           course,
@@ -174,7 +174,7 @@ export const AttendanceManager: React.FC<Props> = ({ isReadOnly = false, canEdit
 
   const filteredStudents = students.filter(s => 
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.roll_number.toLowerCase().includes(searchQuery.toLowerCase())
+    (s.roll_number && s.roll_number.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (

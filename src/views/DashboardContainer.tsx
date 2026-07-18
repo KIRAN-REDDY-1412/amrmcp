@@ -10,6 +10,7 @@ import { HODDashboard } from './dashboards/HODDashboard';
 import { FacultyDashboard } from './dashboards/FacultyDashboard';
 import { StudentDashboard } from './dashboards/StudentDashboard';
 import { ExamCellDashboard } from './dashboards/ExamCellDashboard';
+import { AdmissionsDashboard } from './dashboards/AdmissionsDashboard';
 import { CollegeLogo } from '../components/Icons';
 import {
   LayoutDashboard,
@@ -255,6 +256,12 @@ export const DashboardContainer: React.FC = () => {
         return (
           <div className="p-8 max-w-7xl mx-auto">
             <ExamCellDashboard activeTab={activeTab === 'overview' ? 'exam_cell' : activeTab} />
+          </div>
+        );
+      case 'admission_cell':
+        return (
+          <div className="p-8 max-w-7xl mx-auto">
+            <AdmissionsDashboard />
           </div>
         );
       case 'library':

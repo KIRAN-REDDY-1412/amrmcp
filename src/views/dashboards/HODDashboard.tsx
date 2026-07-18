@@ -351,7 +351,7 @@ export const HODDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilter
     (s) =>
       s.department_id === myDeptId &&
       (s.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        s.roll_number.toLowerCase().includes(searchFilter.toLowerCase()))
+        (s.roll_number && s.roll_number.toLowerCase().includes(searchFilter.toLowerCase())))
   );
 
   const mySubjects = dbState.subjects.filter(

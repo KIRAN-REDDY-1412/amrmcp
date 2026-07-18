@@ -114,7 +114,7 @@ export const FacultyClassAttendance: React.FC = () => {
 
     const recordsToSave = students.map(student => ({
       student_id: student.id,
-      roll_number: student.roll_number,
+      roll_number: student.roll_number || '',
       faculty_id: currentUser?.id || '',
       subject_id: slotSubject!.id,
       course: slotSubject!.course || '',

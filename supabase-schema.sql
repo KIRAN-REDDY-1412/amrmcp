@@ -36,7 +36,7 @@ CREATE TABLE departments (
 CREATE TABLE users (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL UNIQUE,
-    role TEXT NOT NULL CHECK (role IN ('admin', 'principal', 'hod', 'faculty', 'student', 'exam_cell', 'library')),
+    role TEXT NOT NULL CHECK (role IN ('admin', 'principal', 'hod', 'faculty', 'student', 'exam_cell', 'library', 'admission_cell')),
     additional_roles TEXT[] DEFAULT '{}',
     full_name TEXT NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -72,23 +72,66 @@ CREATE TABLE faculty (
     joining_date DATE NOT NULL DEFAULT CURRENT_DATE
 );
 
--- 6. STUDENTS TABLE
+-- 6. STUDENTS TABLE (Extensively updated for Admission Workflow)
 CREATE TABLE students (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+    
+    -- Status
+    status TEXT NOT NULL DEFAULT 'Draft' CHECK (status IN ('Draft', 'Documents Pending', 'Documents Uploaded', 'Verified', 'Admission Approved', 'Roll Number Pending', 'Roll Number Assigned', 'ERP Registration Pending', 'ERP Account Active')),
+    
+    -- Admission Info
+    course TEXT NOT NULL,
+    admission_quota TEXT NOT NULL CHECK (admission_quota IN ('Convenor', 'Management', 'Spot')),
+    roll_number TEXT UNIQUE, -- Nullable initially
+    
+    -- Personal Info
     name TEXT NOT NULL,
-    roll_number TEXT NOT NULL UNIQUE,
-    course TEXT,
+    photo_url TEXT,
+    gender TEXT NOT NULL CHECK (gender IN ('Male', 'Female', 'Other')),
+    dob DATE,
+    phone TEXT NOT NULL CHECK (phone ~ '^[0-9]{10}$'),
+    email TEXT,
+    aadhaar_number TEXT UNIQUE CHECK (aadhaar_number ~ '^[0-9]{12}$'),
+    nationality TEXT,
+    religion TEXT,
+    caste TEXT,
+    sub_caste TEXT,
+    mole_1 TEXT,
+    mole_2 TEXT,
+    address TEXT,
+    
+    -- Parent Info
+    father_name TEXT,
+    mother_name TEXT,
+    parent_phone TEXT,
+    parent_email TEXT,
+    father_occupation TEXT,
+    father_aadhaar TEXT,
+    mother_aadhaar TEXT,
+
+    -- Academic Info (Populated later by Faculty/HOD)
+    department_id UUID REFERENCES departments(id) ON DELETE CASCADE,
     branch TEXT,
     year TEXT,
     semester TEXT,
     section TEXT,
-    department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
-    phone TEXT NOT NULL,
-    guardian_name TEXT NOT NULL,
     academic_year TEXT,
     batch TEXT,
+    mentor_id UUID REFERENCES faculty(id) ON DELETE SET NULL,
+    
     enrollment_date TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 6b. ADMISSION DOCUMENTS TABLE
+CREATE TABLE admission_documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    document_type TEXT NOT NULL,
+    file_data TEXT NOT NULL, -- Storing as Base64 for now
+    status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Verified', 'Rejected')),
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(student_id, document_type)
 );
 
 -- 7. SUBJECTS TABLE
@@ -214,6 +257,7 @@ ALTER TABLE principals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE hods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE faculty ENABLE ROW LEVEL SECURITY;
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admission_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subject_assignments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timetable ENABLE ROW LEVEL SECURITY;
@@ -286,13 +330,19 @@ CREATE POLICY select_students ON students FOR SELECT TO authenticated
     USING (true);
 
 CREATE POLICY admin_principal_manage_students ON students FOR ALL TO authenticated
-    USING (public.get_my_role() IN ('admin', 'principal'));
+    USING (public.get_my_role() IN ('admin', 'principal', 'admission_cell'));
 
 CREATE POLICY hod_manage_dept_students ON students FOR ALL TO authenticated
     USING (public.get_my_role() = 'hod' AND department_id = public.get_my_dept());
 
 CREATE POLICY faculty_manage_dept_students ON students FOR ALL TO authenticated
     USING (public.get_my_role() = 'faculty' AND department_id = public.get_my_dept());
+
+CREATE POLICY select_admission_docs ON admission_documents FOR SELECT TO authenticated
+    USING (true);
+
+CREATE POLICY manage_admission_docs ON admission_documents FOR ALL TO authenticated
+    USING (public.get_my_role() IN ('admin', 'principal', 'admission_cell'));
 
 
 -- -- 7. SUBJECTS POLICIES --

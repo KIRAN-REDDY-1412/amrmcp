@@ -557,20 +557,17 @@ export class Database {
     return true;
   }
 
-  public async grantAdditionalRole(id: string, role: string): Promise<User> {
+  public async updateUserEmail(id: string, newEmail: string): Promise<User> {
     try {
       const user = this.state.users.find((u) => u.id === id);
       if (!user) throw new Error('User not found');
       
-      const currentRoles = user.additional_roles || [];
-      if (currentRoles.includes(role)) return user; // Already has it
-      
-      const newRoles = [...currentRoles, role];
-      const { error } = await supabase.from('users').update({ additional_roles: newRoles }).eq('id', id);
+      const { error } = await supabase.from('users').update({ email: newEmail }).eq('id', id);
       if (error) console.warn('Supabase DB not synced, relying on memory');
       
-      const updatedUser = { ...user, additional_roles: newRoles };
+      const updatedUser = { ...user, email: newEmail };
       this.state.users = this.state.users.map((u) => (u.id === id ? updatedUser : u));
+      this.save();
       return updatedUser;
     } catch (err) {
       console.error(err);

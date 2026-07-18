@@ -51,9 +51,9 @@ export const FacultyClassAttendance: React.FC = () => {
 
     // Load students for the selected subject's parameters and active section
     const fetchedStudents = db.getStudentsByFilters({
-      course: slotSubject.course,
-      year: slotSubject.year,
-      semester: slotSubject.semester,
+      course: slotSubject.course || '',
+      year: slotSubject.year || '',
+      semester: slotSubject.semester || '',
       section: activeSection
     });
 
@@ -87,7 +87,7 @@ export const FacultyClassAttendance: React.FC = () => {
       setAttendanceData({});
       setIsSaved(false);
     }
-  }, [selectedSlot, slotSubject, activeSection, date, dbState.attendance_records]);
+  }, [selectedSlot, slotSubject, activeSection, date, dbState.attendance]);
 
   const handleMarkAll = (status: 'Present' | 'Absent') => {
     const newData: Record<string, 'Present' | 'Absent'> = {};
@@ -117,10 +117,10 @@ export const FacultyClassAttendance: React.FC = () => {
       roll_number: student.roll_number,
       faculty_id: currentUser?.id || '',
       subject_id: slotSubject!.id,
-      course: slotSubject!.course,
-      branch: student.department_id, // simplified
-      year: slotSubject!.year,
-      semester: slotSubject!.semester,
+      course: slotSubject!.course || '',
+      branch: student.department_id || '', // simplified
+      year: slotSubject!.year || '',
+      semester: slotSubject!.semester || '',
       section: activeSection,
       date,
       period: periodName,

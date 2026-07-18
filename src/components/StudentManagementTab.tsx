@@ -157,7 +157,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
     setStudSection(s.section || '');
     setStudAcademicYear(s.academic_year || '');
     setStudBatch(s.batch || '');
-    setStudDeptId(s.department_id);
+    setStudDeptId(s.department_id || '');
     setStudPhone(s.phone);
     
     // Find the user to get their email
@@ -194,7 +194,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
 
       // Update user email if it exists
       const currentStudent = dbState.students.find(s => s.id === selectedStudentId);
-      if (currentStudent && studEmail) {
+      if (currentStudent && currentStudent.user_id && studEmail) {
         await db.updateUserEmail(currentStudent.user_id, studEmail);
       }
 

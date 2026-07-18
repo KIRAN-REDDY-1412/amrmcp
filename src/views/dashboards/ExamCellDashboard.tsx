@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { db, MarkRecord } from '../../services/db';
+import { db } from '../../services/db';
+import type { MarkRecord } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/Toast';
 import { FileCheck, CheckCircle, XCircle, Save } from 'lucide-react';

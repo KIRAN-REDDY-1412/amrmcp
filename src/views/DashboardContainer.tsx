@@ -289,7 +289,7 @@ export const DashboardContainer: React.FC = () => {
           {navLinks.map((link) => {
             const Icon = link.icon;
             // Check if active tab is one of the sublinks
-            const isSubLinkActive = link.subLinks?.some(sub => sub.id === activeTab);
+            const isSubLinkActive = link.subLinks?.some((sub: any) => sub.id === activeTab);
             const isActive = activeTab === link.id || isSubLinkActive;
             const isExpanded = expandedMenus.includes(link.id) || isSubLinkActive;
 
@@ -323,7 +323,7 @@ export const DashboardContainer: React.FC = () => {
                 {/* Submenu rendering */}
                 {link.subLinks && isExpanded && (
                   <div className="mt-1 ml-4 pl-4 border-l-2 border-slate-100 dark:border-navy-800 space-y-1">
-                    {link.subLinks.map(sub => (
+                    {link.subLinks.map((sub: any) => (
                       <button
                         key={sub.id}
                         onClick={() => handleTabChange(sub.id)}
@@ -395,7 +395,7 @@ export const DashboardContainer: React.FC = () => {
           <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
             {navLinks.map((link) => {
               const Icon = link.icon;
-              const isSubLinkActive = link.subLinks?.some(sub => sub.id === activeTab);
+              const isSubLinkActive = link.subLinks?.some((sub: any) => sub.id === activeTab);
               const isActive = activeTab === link.id || isSubLinkActive;
               const isExpanded = expandedMenus.includes(link.id) || isSubLinkActive;
               
@@ -428,7 +428,7 @@ export const DashboardContainer: React.FC = () => {
 
                   {link.subLinks && isExpanded && (
                     <div className="mt-1 ml-4 pl-4 border-l-2 border-slate-100 dark:border-navy-800 space-y-1">
-                      {link.subLinks.map(sub => (
+                      {link.subLinks.map((sub: any) => (
                         <button
                           key={sub.id}
                           onClick={() => handleTabChange(sub.id)}

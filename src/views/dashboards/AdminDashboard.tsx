@@ -45,6 +45,9 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [activeModal, setActiveModal] = useState<'create_dept' | 'edit_dept' | 'create_user' | 'edit_user' | 'create_student' | 'edit_student' | 'reset_password' | 'view_users' | 'bulk_upload' | null>(null);
   const [viewRole, setViewRole] = useState<'principal' | 'hod' | 'faculty' | null>(null);
   
+  // User Directory Filter (Staff vs Students)
+  const [userDirectoryFilter, setUserDirectoryFilter] = useState<'staff' | 'students'>('staff');
+  
   // Bulk Upload
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -611,7 +614,8 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     (u) =>
       (u.full_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
         u.email.toLowerCase().includes(searchFilter.toLowerCase())) &&
-      (activeTab === 'users' || 
+      ((activeTab === 'users' && userDirectoryFilter === 'staff' && u.role !== 'student') ||
+       (activeTab === 'users' && userDirectoryFilter === 'students' && u.role === 'student') ||
        (activeTab === 'administrators' && u.role === 'admin') ||
        (activeTab === 'principals' && u.role === 'principal') ||
        (activeTab === 'hods' && u.role === 'hod') ||
@@ -861,16 +865,41 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-navy-900/60 p-4 rounded-xl border border-slate-200 dark:border-navy-800 shadow-sm">
             <div>
-              <h3 className="text-lg font-bold text-navy-900 dark:text-white">
+              <h3 className="text-lg font-bold text-navy-900 dark:text-white flex items-center gap-3">
                 {activeTab === 'administrators' ? 'Administrator Management' :
                  activeTab === 'principals' ? 'Principal Management' : 
                  activeTab === 'hods' ? 'HOD Management' : 
                  activeTab === 'faculty' ? 'Faculty Management' : 
                  activeTab === 'library' ? 'Library Management' : 
                  activeTab === 'exam_cell' ? 'Exam Cell Management' : 
-                 'Staff & Faculty Directory'}
+                 userDirectoryFilter === 'staff' ? 'Staff & Faculty Directory' : 'Student Login Directory'}
               </h3>
-              <p className="text-xs text-navy-400">Manage login credentials and system-wide roles</p>
+              <p className="text-xs text-navy-400 mt-1">Manage login credentials and system-wide roles</p>
+              
+              {activeTab === 'users' && (
+                <div className="flex bg-slate-100 dark:bg-navy-950 p-1 rounded-xl mt-4 w-max border border-slate-200 dark:border-navy-800">
+                  <button
+                    onClick={() => setUserDirectoryFilter('staff')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      userDirectoryFilter === 'staff' 
+                        ? 'bg-white dark:bg-navy-800 text-primary-600 shadow-sm' 
+                        : 'text-navy-500 hover:text-navy-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Staff & Faculty
+                  </button>
+                  <button
+                    onClick={() => setUserDirectoryFilter('students')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      userDirectoryFilter === 'students' 
+                        ? 'bg-white dark:bg-navy-800 text-primary-600 shadow-sm' 
+                        : 'text-navy-500 hover:text-navy-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Students
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               {(activeTab === 'administrators' || activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty') && (
@@ -900,22 +929,36 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                   <Trash2 size={16} /> Delete Selected ({selectedUserIds.length})
                 </button>
               )}
-              <button
-                onClick={() => {
-                  setIsAssignExisting(false);
-                  let defaultRole = 'faculty';
-                  if (activeTab === 'administrators') defaultRole = 'admin';
-                  if (activeTab === 'principals') defaultRole = 'principal';
-                  if (activeTab === 'hods') defaultRole = 'hod';
-                  if (activeTab === 'library') defaultRole = 'library';
-                  if (activeTab === 'exam_cell') defaultRole = 'exam_cell';
-                  setUserRole(defaultRole as any);
-                  setActiveModal('create_user');
-                }}
-                className="flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-bold shadow-md shadow-primary-500/20 transition-colors"
-              >
-                <Plus size={16} /> Register Staff
-              </button>
+              <div className="flex items-center gap-2">
+                {activeTab === 'users' && (
+                  <button
+                    onClick={() => {
+                      setIsAssignExisting(false);
+                      setUserRole('student');
+                      setActiveModal('create_user');
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-500/20 transition-colors"
+                  >
+                    <Plus size={16} /> Register Student ERP
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setIsAssignExisting(false);
+                    let defaultRole = 'faculty';
+                    if (activeTab === 'administrators') defaultRole = 'admin';
+                    if (activeTab === 'principals') defaultRole = 'principal';
+                    if (activeTab === 'hods') defaultRole = 'hod';
+                    if (activeTab === 'library') defaultRole = 'library';
+                    if (activeTab === 'exam_cell') defaultRole = 'exam_cell';
+                    setUserRole(defaultRole as any);
+                    setActiveModal('create_user');
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-bold shadow-md shadow-primary-500/20 transition-colors"
+                >
+                  <Plus size={16} /> Register Staff
+                </button>
+              </div>
             </div>
           </div>
 

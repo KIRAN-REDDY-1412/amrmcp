@@ -37,19 +37,8 @@ export const LandingPage: React.FC = () => {
   const loginRoles = [
     {
       id: 'admin',
-      title: 'Admin Login',
-      description: 'Super Admin settings, account creations, database management, and audit logs.',
-      icon: ShieldCheck,
-      color: 'from-navy-700 to-blue-900',
-      lightBg: 'bg-slate-50/60 hover:bg-slate-50',
-      darkBg: 'dark:bg-navy-900/40 dark:hover:bg-navy-900/60',
-      borderColor: 'border-slate-200 dark:border-navy-800',
-      iconColor: 'text-navy-700 dark:text-navy-300',
-    },
-    {
-      id: 'administration',
-      title: 'Administration Login',
-      description: 'Manage staff, payroll, fees, and institutional operations.',
+      title: 'Administrator Login',
+      description: 'Manage institutional operations, staff, account creations, database settings, and audit logs.',
       icon: Building,
       color: 'from-orange-600 to-amber-700',
       lightBg: 'bg-orange-50/50 hover:bg-orange-50',

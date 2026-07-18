@@ -131,11 +131,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await db.syncWithSupabase();
 
       // 3. Verify user role & status
-      const user = db.getUserById(authData.user.id);
+      let user = db.getUserById(authData.user.id);
+      
       if (!user) {
-        // Sign out if public record doesn't exist yet
-        await supabase.auth.signOut();
-        throw new Error('User record not found in system database.');
+        if (role === 'admin') {
+          // Attempt auto-recovery if public.users is empty or missing admin
+          const { data: existingAdmins } = await supabase.from('users').select('id, email').eq('role', 'admin');
+          if (!existingAdmins || existingAdmins.length === 0) {
+            console.warn('Admin record missing in public.users, auto-recovering...');
+            await supabase.from('users').insert([{
+              id: authData.user.id,
+              email: email,
+              role: 'admin',
+              full_name: 'System Admin',
+              is_active: true
+            }]);
+            await db.syncWithSupabase();
+            user = db.getUserById(authData.user.id);
+          } else {
+            await supabase.auth.signOut();
+            throw new Error(`User record not found. The registered admin is ${existingAdmins[0]?.email}. Please use the correct email.`);
+          }
+        }
+
+        if (!user) {
+          await supabase.auth.signOut();
+          throw new Error('User record not found in system database.');
+        }
       }
 
       if (user.role !== role && (!user.additional_roles || !user.additional_roles.includes(role))) {

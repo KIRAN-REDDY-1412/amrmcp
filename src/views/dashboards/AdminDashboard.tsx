@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast';
 import { DonutChart, BarChart } from '../../components/Charts';
 import { StudentManagementTab } from '../../components/StudentManagementTab';
 import { AttendanceManager } from '../../components/AttendanceManager';
+import * as XLSX from 'xlsx';
 import {
   Building,
   Users,
@@ -41,8 +42,12 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [copiedSQL, setCopiedSQL] = useState(false);
 
   // Forms Modals Toggle
-  const [activeModal, setActiveModal] = useState<'create_dept' | 'edit_dept' | 'create_user' | 'edit_user' | 'create_student' | 'edit_student' | 'reset_password' | 'view_users' | null>(null);
+  const [activeModal, setActiveModal] = useState<'create_dept' | 'edit_dept' | 'create_user' | 'edit_user' | 'create_student' | 'edit_student' | 'reset_password' | 'view_users' | 'bulk_upload' | null>(null);
   const [viewRole, setViewRole] = useState<'principal' | 'hod' | 'faculty' | null>(null);
+  
+  // Bulk Upload
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Pagination & Search States
   const [currentPage, setCurrentPage] = useState(1);
@@ -410,6 +415,148 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     }
   };
 
+  // --- Bulk Upload Methods ---
+  const handleDownloadTemplate = () => {
+    let templateData: any[] = [];
+    if (activeTab === 'principals') {
+      templateData = [{
+        "Full Name": "Dr. John Doe",
+        "Email Address": "john@example.com",
+        "Password": "Password123!",
+        "Qualifications": "Ph.D",
+        "Phone": "9876543210"
+      }];
+    } else if (activeTab === 'hods') {
+      templateData = [{
+        "Full Name": "Dr. Jane Smith",
+        "Email Address": "jane@example.com",
+        "Password": "Password123!",
+        "Qualifications": "M.Pharm, Ph.D",
+        "Phone": "9876543210",
+        "Department Code": "PHARM-D"
+      }];
+    } else if (activeTab === 'faculty') {
+      templateData = [{
+        "Full Name": "Alice Johnson",
+        "Email Address": "alice@example.com",
+        "Password": "Password123!",
+        "Qualifications": "M.Pharm",
+        "Phone": "9876543210",
+        "Department Code": "PHARM-D",
+        "Designation": "Assistant Professor"
+      }];
+    }
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+    XLSX.writeFile(workbook, `${activeTab}_bulk_template.xlsx`);
+  };
+
+  const handleBulkUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile) return;
+
+    setIsUploading(true);
+    try {
+      const data = await uploadFile.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<any>(worksheet);
+
+      let successCount = 0;
+      let errorCount = 0;
+      let lastErrorMsg = "";
+      
+      let targetRole = 'principal';
+      if (activeTab === 'hods') targetRole = 'hod';
+      if (activeTab === 'faculty') targetRole = 'faculty';
+
+      for (const row of rows) {
+        try {
+          const name = row["Full Name"];
+          const email = row["Email Address"];
+          const password = row.Password || "DefaultPassword123!";
+          const qual = row.Qualifications || "";
+          const phone = row.Phone || "";
+          
+          if (!name || !email) {
+            errorCount++;
+            lastErrorMsg = "Missing Name or Email";
+            continue;
+          }
+
+          let deptId = '';
+          if (targetRole === 'hod' || targetRole === 'faculty') {
+            const deptCode = row["Department Code"];
+            if (deptCode) {
+              const dept = db.getRawState().departments.find(d => d.code.toUpperCase() === String(deptCode).toUpperCase());
+              if (dept) deptId = dept.id;
+            }
+          }
+
+          const newUser = await db.createUser({
+            email: String(email),
+            password: String(password),
+            role: targetRole as any,
+            full_name: String(name),
+            is_active: true,
+          });
+
+          if (targetRole === 'principal') {
+            await db.createPrincipalProfile({
+              user_id: newUser.id,
+              qualifications: String(qual),
+              phone: String(phone),
+              bio: ''
+            });
+          } else if (targetRole === 'hod') {
+            await db.createHODProfile({
+              user_id: newUser.id,
+              department_id: deptId,
+              qualifications: String(qual),
+              phone: String(phone)
+            });
+          } else if (targetRole === 'faculty') {
+            await db.createFacultyProfile({
+              user_id: newUser.id,
+              department_id: deptId,
+              designation: row.Designation ? String(row.Designation) : '',
+              qualifications: String(qual),
+              phone: String(phone),
+              joining_date: new Date().toISOString().split('T')[0]
+            });
+          }
+
+          successCount++;
+        } catch (err: any) {
+          errorCount++;
+          lastErrorMsg = err.message || JSON.stringify(err);
+        }
+      }
+
+      let toastMsg = `Successfully registered ${successCount} staff.`;
+      if (errorCount > 0) toastMsg += ` Failed ${errorCount}. Last error: ${lastErrorMsg}`;
+      showToast(toastMsg, successCount > 0 ? 'success' : 'error');
+      
+      if (successCount > 0) {
+        await db.logAction(
+          currentUser!.id,
+          currentUser!.email,
+          currentUser!.role,
+          'Bulk Register Staff',
+          `Bulk registered ${successCount} ${targetRole} users`
+        );
+      }
+      setActiveModal(null);
+      triggerStateRefresh();
+    } catch (err: any) {
+      showToast(`Upload failed: ${err.message}`, 'error');
+    } finally {
+      setIsUploading(false);
+      setUploadFile(null);
+    }
+  };
+
   // Helpers
   const getDeptName = (id: string) => {
     return dbState.departments.find((d) => d.id === id)?.name || 'N/A';
@@ -689,10 +836,19 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
             <div className="flex gap-2">
               {(activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty') && (
                 <>
-                  <button className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-navy-800 dark:hover:bg-navy-700 text-white rounded-xl text-sm font-bold shadow-md transition-colors">
+                  <button 
+                    onClick={handleDownloadTemplate}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-navy-800 dark:hover:bg-navy-700 text-white rounded-xl text-sm font-bold shadow-md transition-colors"
+                  >
                     <Download size={16} /> Template
                   </button>
-                  <button className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-navy-800 dark:hover:bg-navy-700 text-white rounded-xl text-sm font-bold shadow-md transition-colors">
+                  <button 
+                    onClick={() => {
+                      setUploadFile(null);
+                      setActiveModal('bulk_upload');
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-navy-800 dark:hover:bg-navy-700 text-white rounded-xl text-sm font-bold shadow-md transition-colors"
+                  >
                     <Upload size={16} /> Bulk Upload
                   </button>
                 </>
@@ -1283,6 +1439,31 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                   className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm"
                 >
                   Apply Password Overwrite
+                </button>
+              </form>
+            )}
+
+            {/* E. Bulk Upload Modal */}
+            {activeModal === 'bulk_upload' && (
+              <form onSubmit={handleBulkUpload} className="space-y-4">
+                <div className="bg-slate-50 dark:bg-navy-950 p-4 rounded-xl border border-dashed border-slate-300 dark:border-navy-700 text-center">
+                  <Upload className="mx-auto text-navy-400 mb-2" size={24} />
+                  <p className="text-sm font-bold text-navy-900 dark:text-white mb-1">Upload Staff Excel File</p>
+                  <p className="text-xs text-navy-500 mb-3">Ensure the file matches the downloaded template format.</p>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    required
+                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                    className="block w-full text-xs text-navy-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-navy-800 dark:file:text-white"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isUploading || !uploadFile}
+                  className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                >
+                  {isUploading ? 'Uploading...' : 'Process Bulk Registration'}
                 </button>
               </form>
             )}

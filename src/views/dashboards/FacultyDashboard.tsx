@@ -4,7 +4,7 @@ import type { AttendanceRecord, MarkRecord } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/Toast';
 import { StudentManagementTab } from '../../components/StudentManagementTab';
-import { AttendanceManager } from '../../components/AttendanceManager';
+import { FacultyClassAttendance } from '../../components/FacultyClassAttendance';
 import {
   Plus,
   Trash2,
@@ -44,9 +44,8 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
 
   // Marks Form states
   const [selectedMarkSubId, setSelectedMarkSubId] = useState('');
-  const [examType, setExamType] = useState<'Internal' | 'Mid-term' | 'End-term'>('Internal');
-  const [marksValues, setMarksValues] = useState<Record<string, number>>({});
-  const [maxMarks, setMaxMarks] = useState<number>(100);
+  const [batchStatus, setBatchStatus] = useState<string | null>(null);
+  const [marksValues, setMarksValues] = useState<Record<string, { mid1?: number; mid2?: number; mid3?: number; cmm?: number }>>({});
 
   // Timetable Slot Form states
   const [newSlotDay, setNewSlotDay] = useState('Monday');
@@ -140,53 +139,56 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
     if (!selectedMarkSubId) return;
 
     const existing = dbState.marks.filter(
-      (m) => m.subject_id === selectedMarkSubId && m.exam_type === examType
+      (m) => m.subject_id === selectedMarkSubId
     );
 
-    const initialMarks: Record<string, number> = {};
-    let initialMax = 100;
+    const initialMarks: Record<string, { mid1?: number; mid2?: number; mid3?: number; cmm?: number }> = {};
 
     myDeptStudents.forEach((student) => {
       const match = existing.find((e) => e.student_id === student.id);
-      initialMarks[student.id] = match ? match.marks_obtained : 0;
-      if (match) initialMax = match.max_marks;
+      initialMarks[student.id] = match ? { mid1: match.mid1_marks, mid2: match.mid2_marks, mid3: match.mid3_marks, cmm: match.cmm_marks } : {};
     });
 
     setMarksValues(initialMarks);
-    setMaxMarks(initialMax);
+    setBatchStatus(existing.length > 0 ? existing[0].internal_status || 'Draft' : null);
   };
 
   useEffect(() => {
     handleLoadMarksList();
-  }, [selectedMarkSubId, examType, dbState.marks]);
+  }, [selectedMarkSubId, dbState.marks]);
 
-  const handleMarkChange = (studentId: string, val: string) => {
-    const num = Math.min(Math.max(parseFloat(val) || 0, 0), maxMarks);
+  const handleMarkChange = (studentId: string, field: 'mid1' | 'mid2' | 'mid3' | 'cmm', val: string) => {
+    const num = val === '' ? undefined : Math.max(parseFloat(val) || 0, 0);
     setMarksValues((prev) => ({
       ...prev,
-      [studentId]: num,
+      [studentId]: {
+        ...prev[studentId],
+        [field]: num,
+      },
     }));
   };
 
-  const handleSaveMarks = async () => {
+  const handleSaveMarks = async (submitForApproval: boolean) => {
     if (!selectedMarkSubId) {
       showToast('Select a subject first.', 'warning');
       return;
     }
 
-    const records: Omit<MarkRecord, 'id'>[] = Object.entries(marksValues).map(
-      ([studentId, marks_obtained]) => ({
+    const records: Pick<MarkRecord, 'subject_id' | 'student_id' | 'mid1_marks' | 'mid2_marks' | 'mid3_marks' | 'cmm_marks' | 'internal_status'>[] = Object.entries(marksValues).map(
+      ([studentId, marks]) => ({
         subject_id: selectedMarkSubId,
         student_id: studentId,
-        exam_type: examType,
-        marks_obtained,
-        max_marks: maxMarks,
+        mid1_marks: marks.mid1,
+        mid2_marks: marks.mid2,
+        mid3_marks: marks.mid3,
+        cmm_marks: marks.cmm,
+        internal_status: submitForApproval ? 'Pending Exam Cell' : (batchStatus === 'Rejected' ? 'Draft' : (batchStatus as any || 'Draft')),
       })
     );
 
     try {
-      await db.saveMarksBatch(records);
-      showToast('Grade book saved successfully.', 'success');
+      await db.saveInternalMarksBatch(records);
+      showToast(submitForApproval ? 'Marks submitted to Exam Cell.' : 'Grade book saved successfully.', 'success');
       triggerStateRefresh();
     } catch (err: any) {
       showToast(err.message || 'Failed to save marks.', 'error');
@@ -419,15 +421,7 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
       )}
 
       {activeTab === 'attendance' && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center bg-white dark:bg-navy-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-navy-800 animate-fade-in">
-            <div>
-              <h2 className="text-xl font-bold text-navy-900 dark:text-white">Student Attendance</h2>
-              <p className="text-sm text-navy-500 mt-1">Manage daily attendance for your classes</p>
-            </div>
-          </div>
-          <AttendanceManager canEditSubmitted={false} />
-        </div>
+        <FacultyClassAttendance />
       )}
 
       {/* 4. MARKS ENTRY TAB */}
@@ -445,9 +439,9 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
               <p className="text-xs mt-1 text-navy-400">Subjects must be allocated before grades can be uploaded.</p>
             </div>
           ) : (
-            <div className="space-y-6">
+                <div className="space-y-6">
               {/* Filter controls */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 dark:bg-navy-950/60 border border-slate-100 dark:border-navy-850 rounded-2xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-navy-950/60 border border-slate-100 dark:border-navy-850 rounded-2xl">
                 <div>
                   <label className="block text-xs font-bold text-navy-500 uppercase">Subject</label>
                   <select
@@ -458,38 +452,33 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
                     <option value="">-- Choose Subject --</option>
                     {myAssignedSubjects.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
+                        {s.name} ({s.code}) - {s.course}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy-500 uppercase">Examination Type</label>
-                  <select
-                    value={examType}
-                    onChange={(e) => setExamType(e.target.value as any)}
-                    className="mt-1 block w-full p-2.5 rounded-xl border border-slate-200 dark:border-navy-800 bg-white dark:bg-navy-950 text-xs font-semibold text-navy-900 dark:text-white"
-                  >
-                    <option value="Internal">Internal Assessment</option>
-                    <option value="Mid-term">Mid-Term Exam</option>
-                    <option value="End-term">End-Term Semestral</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-navy-500 uppercase">Max Score Cap</label>
-                  <input
-                    type="number"
-                    value={maxMarks}
-                    onChange={(e) => setMaxMarks(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="mt-1 block w-full p-2.5 rounded-xl border border-slate-200 dark:border-navy-800 bg-white dark:bg-navy-950 text-xs font-semibold text-navy-900 dark:text-white"
-                  />
+                
+                <div className="flex items-end">
+                  {batchStatus && selectedMarkSubId && (
+                    <div className="flex items-center gap-2 p-2.5 w-full bg-white dark:bg-navy-950 border border-slate-200 dark:border-navy-800 rounded-xl">
+                      <span className="text-xs font-bold text-navy-600 dark:text-navy-300">Approval Status:</span>
+                      <span className={`text-[10px] px-2.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                        batchStatus === 'Approved' ? 'bg-green-100 text-green-700' :
+                        batchStatus === 'Rejected' ? 'bg-red-100 text-red-700' :
+                        batchStatus === 'Pending Exam Cell' ? 'bg-amber-100 text-amber-705' :
+                        'bg-slate-100 text-slate-600 dark:bg-navy-800 dark:text-navy-300'
+                      }`}>
+                        {batchStatus}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Marks inputs */}
               {!selectedMarkSubId ? (
                 <div className="py-12 text-center text-xs text-navy-455 bg-slate-50/50 dark:bg-navy-950/20 rounded-2xl">
-                  Choose a subject and exam type to enter student scores.
+                  Choose a subject to enter student internal scores.
                 </div>
               ) : myDeptStudents.length === 0 ? (
                 <div className="py-12 text-center text-xs text-navy-450">
@@ -502,29 +491,89 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
                       <thead>
                         <tr className="border-b border-slate-200 dark:border-navy-800 text-navy-400 font-bold text-xs uppercase tracking-wider">
                           <th className="pb-3 pl-2">Student Name</th>
-                          <th className="pb-3">Roll Number</th>
-                          <th className="pb-3 pr-2 text-right">Marks Obtained / Max</th>
+                          <th className="pb-3 text-center">Mid-1</th>
+                          <th className="pb-3 text-center">Mid-2</th>
+                          {dbState.subjects.find(s => s.id === selectedMarkSubId)?.course === 'PHARM.D' && (
+                            <th className="pb-3 text-center">Mid-3</th>
+                          )}
+                          <th className="pb-3 text-center">Average</th>
+                          <th className="pb-3 text-center">CMM</th>
+                          <th className="pb-3 pr-2 text-center text-primary-500">Internal Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-navy-850 font-medium">
                         {myDeptStudents.map((student) => {
-                          const val = marksValues[student.id] || 0;
+                          const val = marksValues[student.id] || {};
+                          const isPharmD = dbState.subjects.find(s => s.id === selectedMarkSubId)?.course === 'PHARM.D';
+                          const mid1 = val.mid1 ?? 0;
+                          const mid2 = val.mid2 ?? 0;
+                          const mid3 = val.mid3 ?? 0;
+                          const cmm = val.cmm ?? 0;
+                          
+                          const numMids = isPharmD ? 3 : 2;
+                          let avg = 0;
+                          if (isPharmD) {
+                            avg = (mid1 + mid2 + mid3) / 3;
+                          } else {
+                            avg = (mid1 + mid2) / 2;
+                          }
+                          const total = avg + cmm;
+                          
+                          const readOnly = batchStatus === 'Approved' || batchStatus === 'Pending Exam Cell';
+
                           return (
                             <tr key={student.id} className="text-navy-950 dark:text-navy-200">
-                              <td className="py-3 pl-2 font-bold">{student.name}</td>
-                              <td className="py-3 text-xs font-mono font-bold text-primary-500">{student.roll_number}</td>
-                              <td className="py-3 pr-2 text-right">
-                                <div className="inline-flex items-center gap-2">
+                              <td className="py-3 pl-2">
+                                <p className="font-bold">{student.name}</p>
+                                <p className="text-[10px] font-mono text-navy-400">{student.roll_number}</p>
+                              </td>
+                              <td className="py-3 text-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={val.mid1 ?? ''}
+                                  onChange={(e) => handleMarkChange(student.id, 'mid1', e.target.value)}
+                                  disabled={readOnly}
+                                  className="w-16 p-1.5 border border-slate-200 dark:border-navy-800 rounded-lg text-center bg-slate-50 dark:bg-navy-950 text-xs focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                                />
+                              </td>
+                              <td className="py-3 text-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={val.mid2 ?? ''}
+                                  onChange={(e) => handleMarkChange(student.id, 'mid2', e.target.value)}
+                                  disabled={readOnly}
+                                  className="w-16 p-1.5 border border-slate-200 dark:border-navy-800 rounded-lg text-center bg-slate-50 dark:bg-navy-950 text-xs focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                                />
+                              </td>
+                              {isPharmD && (
+                                <td className="py-3 text-center">
                                   <input
                                     type="number"
                                     min={0}
-                                    max={maxMarks}
-                                    value={val}
-                                    onChange={(e) => handleMarkChange(student.id, e.target.value)}
-                                    className="w-20 p-1.5 border border-slate-200 dark:border-navy-800 rounded-lg text-center bg-slate-50 dark:bg-navy-950 text-xs text-navy-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    value={val.mid3 ?? ''}
+                                    onChange={(e) => handleMarkChange(student.id, 'mid3', e.target.value)}
+                                    disabled={readOnly}
+                                    className="w-16 p-1.5 border border-slate-200 dark:border-navy-800 rounded-lg text-center bg-slate-50 dark:bg-navy-950 text-xs focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
                                   />
-                                  <span className="text-xs text-navy-400 font-bold">/ {maxMarks}</span>
-                                </div>
+                                </td>
+                              )}
+                              <td className="py-3 text-center font-bold text-navy-400">
+                                {avg.toFixed(1)}
+                              </td>
+                              <td className="py-3 text-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={val.cmm ?? ''}
+                                  onChange={(e) => handleMarkChange(student.id, 'cmm', e.target.value)}
+                                  disabled={readOnly}
+                                  className="w-16 p-1.5 border border-slate-200 dark:border-navy-800 rounded-lg text-center bg-slate-50 dark:bg-navy-950 text-xs focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                                />
+                              </td>
+                              <td className="py-3 pr-2 text-center font-black text-primary-600 dark:text-primary-400">
+                                {total.toFixed(1)}
                               </td>
                             </tr>
                           );
@@ -533,14 +582,22 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
                     </table>
                   </div>
 
-                  <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-navy-800">
-                    <button
-                      onClick={handleSaveMarks}
-                      className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold shadow-md shadow-primary-500/20"
-                    >
-                      Upload Marks Ledger
-                    </button>
-                  </div>
+                  {batchStatus !== 'Approved' && batchStatus !== 'Pending Exam Cell' && (
+                    <div className="flex justify-end pt-4 gap-3 border-t border-slate-100 dark:border-navy-850">
+                      <button
+                        onClick={() => handleSaveMarks(false)}
+                        className="px-6 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-navy-800 dark:text-navy-300 dark:hover:bg-navy-700 rounded-xl text-sm font-bold transition-colors"
+                      >
+                        Save Draft
+                      </button>
+                      <button
+                        onClick={() => handleSaveMarks(true)}
+                        className="px-6 py-2.5 bg-primary-600 text-white hover:bg-primary-700 rounded-xl text-sm font-bold shadow-lg shadow-primary-500/30 transition-all active:scale-95 flex items-center gap-2"
+                      >
+                        <Save size={18} /> Submit to Exam Cell
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

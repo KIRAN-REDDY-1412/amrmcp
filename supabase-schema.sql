@@ -36,7 +36,8 @@ CREATE TABLE departments (
 CREATE TABLE users (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL UNIQUE,
-    role TEXT NOT NULL CHECK (role IN ('admin', 'principal', 'hod', 'faculty')),
+    role TEXT NOT NULL CHECK (role IN ('admin', 'principal', 'hod', 'faculty', 'student', 'exam_cell', 'library')),
+    additional_roles TEXT[] DEFAULT '{}',
     full_name TEXT NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -96,7 +97,10 @@ CREATE TABLE subjects (
     name TEXT NOT NULL,
     code TEXT NOT NULL UNIQUE,
     department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
-    credits INT NOT NULL CHECK (credits > 0)
+    credits INT NOT NULL CHECK (credits > 0),
+    course TEXT,
+    year TEXT,
+    semester TEXT
 );
 
 -- 8. SUBJECT ASSIGNMENTS
@@ -134,11 +138,17 @@ CREATE TABLE marks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-    exam_type TEXT NOT NULL CHECK (exam_type IN ('Internal', 'Mid-term', 'End-term')),
-    marks_obtained NUMERIC NOT NULL CHECK (marks_obtained >= 0),
-    max_marks NUMERIC NOT NULL CHECK (max_marks > 0),
-    CONSTRAINT chk_marks CHECK (marks_obtained <= max_marks),
-    UNIQUE (subject_id, student_id, exam_type)
+    
+    mid1_marks NUMERIC,
+    mid2_marks NUMERIC,
+    mid3_marks NUMERIC,
+    cmm_marks NUMERIC,
+    internal_status TEXT NOT NULL DEFAULT 'Draft' CHECK (internal_status IN ('Draft', 'Pending Exam Cell', 'Approved', 'Rejected')),
+    
+    semester_marks NUMERIC,
+    semester_status TEXT NOT NULL DEFAULT 'Draft' CHECK (semester_status IN ('Draft', 'Pending Principal', 'Approved', 'Rejected')),
+    
+    UNIQUE (subject_id, student_id)
 );
 
 -- 12. LEAVE REQUESTS TABLE

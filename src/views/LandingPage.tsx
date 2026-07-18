@@ -10,7 +10,10 @@ import {
   Sun, 
   Moon,
   Info,
-  User
+  User,
+  Building,
+  ClipboardList,
+  Library
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -32,6 +35,28 @@ export const LandingPage: React.FC = () => {
   }, [darkMode]);
 
   const loginRoles = [
+    {
+      id: 'admin',
+      title: 'Admin Login',
+      description: 'Super Admin settings, account creations, database management, and audit logs.',
+      icon: ShieldCheck,
+      color: 'from-navy-700 to-blue-900',
+      lightBg: 'bg-slate-50/60 hover:bg-slate-50',
+      darkBg: 'dark:bg-navy-900/40 dark:hover:bg-navy-900/60',
+      borderColor: 'border-slate-200 dark:border-navy-800',
+      iconColor: 'text-navy-700 dark:text-navy-300',
+    },
+    {
+      id: 'administration',
+      title: 'Administration Login',
+      description: 'Manage staff, payroll, fees, and institutional operations.',
+      icon: Building,
+      color: 'from-orange-600 to-amber-700',
+      lightBg: 'bg-orange-50/50 hover:bg-orange-50',
+      darkBg: 'dark:bg-orange-950/20 dark:hover:bg-orange-950/30',
+      borderColor: 'border-orange-200 dark:border-orange-900/40',
+      iconColor: 'text-orange-600 dark:text-orange-400',
+    },
     {
       id: 'principal',
       title: 'Principal Login',
@@ -77,16 +102,27 @@ export const LandingPage: React.FC = () => {
       iconColor: 'text-emerald-600 dark:text-emerald-400',
     },
     {
-      id: 'admin',
-      title: 'Admin Login',
-      description: 'Super Admin settings, account creations, database management, and audit logs.',
-      icon: ShieldCheck,
-      color: 'from-navy-700 to-blue-900',
-      lightBg: 'bg-slate-50/60 hover:bg-slate-50',
-      darkBg: 'dark:bg-navy-900/40 dark:hover:bg-navy-900/60',
-      borderColor: 'border-slate-200 dark:border-navy-800',
-      iconColor: 'text-navy-700 dark:text-navy-300',
+      id: 'exam_cell',
+      title: 'Exam Cell Login',
+      description: 'Manage exam schedules, seating arrangements, and result publishing.',
+      icon: ClipboardList,
+      color: 'from-purple-600 to-fuchsia-700',
+      lightBg: 'bg-purple-50/50 hover:bg-purple-50',
+      darkBg: 'dark:bg-purple-950/20 dark:hover:bg-purple-950/30',
+      borderColor: 'border-purple-200 dark:border-purple-900/40',
+      iconColor: 'text-purple-600 dark:text-purple-400',
     },
+    {
+      id: 'library',
+      title: 'Library Login',
+      description: 'Manage books, digital resources, and student book issuances.',
+      icon: Library,
+      color: 'from-rose-600 to-pink-700',
+      lightBg: 'bg-rose-50/50 hover:bg-rose-50',
+      darkBg: 'dark:bg-rose-950/20 dark:hover:bg-rose-950/30',
+      borderColor: 'border-rose-200 dark:border-rose-900/40',
+      iconColor: 'text-rose-600 dark:text-rose-400',
+    }
   ];
 
   const handleRoleSelect = (roleId: string) => {

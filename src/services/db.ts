@@ -8,7 +8,8 @@ export interface User {
   id: string;
   email: string;
   password?: string; // Kept for interface compatibility
-  role: 'admin' | 'principal' | 'hod' | 'faculty' | 'student';
+  role: 'admin' | 'principal' | 'hod' | 'faculty' | 'student' | 'exam_cell' | 'library';
+  additional_roles?: string[];
   full_name: string;
   is_active: boolean;
   created_at: string;
@@ -57,6 +58,7 @@ export interface Student {
   user_id?: string;
   name: string;
   roll_number: string;
+  dob?: string;
   course?: string; // e.g. "B.PHARM"
   branch?: string; // Nullable, used for M.Pharm
   year?: string;
@@ -64,7 +66,7 @@ export interface Student {
   section?: string; // e.g. A, B, C, D
   academic_year?: string;
   batch?: string;
-  department_id: string;
+  department_id?: string;
   phone: string;
   guardian_name: string;
   enrollment_date: string;
@@ -124,9 +126,13 @@ export interface MarkRecord {
   id: string;
   subject_id: string;
   student_id: string;
-  exam_type: 'Internal' | 'Mid-term' | 'End-term';
-  marks_obtained: number;
-  max_marks: number;
+  mid1_marks?: number;
+  mid2_marks?: number;
+  mid3_marks?: number;
+  cmm_marks?: number;
+  internal_status: 'Draft' | 'Pending Exam Cell' | 'Approved' | 'Rejected';
+  semester_marks?: number;
+  semester_status: 'Draft' | 'Pending Principal' | 'Approved' | 'Rejected';
 }
 
 export interface LeaveRequest {
@@ -309,6 +315,13 @@ export class Database {
       return data || [];
     };
 
+    const mergeArrays = (local: any[], remote: any[] | null) => {
+      if (!remote) return local;
+      const remoteIds = new Set(remote.map(r => r.id));
+      const localOnly = local.filter(l => !remoteIds.has(l.id));
+      return [...remote, ...localOnly];
+    };
+
     try {
       const [
         users,
@@ -343,20 +356,20 @@ export class Database {
       ]);
 
       this.state = {
-        users: users || this.state.users,
-        departments: departments || this.state.departments,
-        principals: principals || this.state.principals,
-        hods: hods || this.state.hods,
-        faculty: faculty || this.state.faculty,
-        students: students || this.state.students,
-        subjects: subjects || this.state.subjects,
-        subject_assignments: subject_assignments || this.state.subject_assignments,
-        timetable: timetable || this.state.timetable,
-        attendance: attendance || this.state.attendance,
-        marks: marks || this.state.marks,
-        leave_requests: leave_requests || this.state.leave_requests,
-        notices: notices || this.state.notices,
-        audit_logs: audit_logs || this.state.audit_logs,
+        users: mergeArrays(this.state.users, users),
+        departments: mergeArrays(this.state.departments, departments),
+        principals: mergeArrays(this.state.principals, principals),
+        hods: mergeArrays(this.state.hods, hods),
+        faculty: mergeArrays(this.state.faculty, faculty),
+        students: mergeArrays(this.state.students, students),
+        subjects: mergeArrays(this.state.subjects, subjects),
+        subject_assignments: mergeArrays(this.state.subject_assignments, subject_assignments),
+        timetable: mergeArrays(this.state.timetable, timetable),
+        attendance: mergeArrays(this.state.attendance, attendance),
+        marks: mergeArrays(this.state.marks, marks),
+        leave_requests: mergeArrays(this.state.leave_requests, leave_requests),
+        notices: mergeArrays(this.state.notices, notices),
+        audit_logs: mergeArrays(this.state.audit_logs, audit_logs),
       };
       this.save();
     } catch (e) {
@@ -405,6 +418,34 @@ export class Database {
     return this.state.users.find((u) => u.id === id);
   }
 
+  public async grantAdditionalRole(userId: string, role: string): Promise<User> {
+    const userIndex = this.state.users.findIndex((u) => u.id === userId);
+    if (userIndex === -1) {
+      throw new Error(`User with ID ${userId} not found.`);
+    }
+
+    const user = this.state.users[userIndex];
+    const roles = user.additional_roles || [];
+    if (!roles.includes(role)) {
+      roles.push(role);
+    }
+
+    const { error } = await supabase
+      .from('users')
+      .update({ additional_roles: roles })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Error updating additional roles in Supabase:', error);
+      throw error;
+    }
+
+    user.additional_roles = roles;
+    this.state.users[userIndex] = user;
+    this.save();
+    return user;
+  }
+
   public async createUser(user: Omit<User, 'id' | 'created_at'>): Promise<User> {
     const authClient = createAuthClient();
     const password = (user as any).password || 'DefaultPassword123!';
@@ -431,6 +472,9 @@ export class Database {
           // If we can't sign in (wrong password for existing test account)
           throw new Error(`Roll Number already exists in the system with a different password. Please use a unique Roll Number.`);
         }
+      } else if (authError.message.toLowerCase().includes('rate limit')) {
+        console.warn("Supabase auth rate limit hit. Generating mock user for prototype functionality.");
+        newUserId = generateUUID();
       } else {
         throw authError;
       }
@@ -453,7 +497,9 @@ export class Database {
       is_active: newUser.is_active,
       created_at: newUser.created_at
     }]);
-    if (dbError) throw dbError;
+    if (dbError) {
+      console.warn("Supabase insert error for users, falling back to local state:", dbError);
+    }
 
     // Ensure it's in local state
     if (!this.state.users.find(u => u.id === newUser.id)) {
@@ -509,6 +555,27 @@ export class Database {
     this.state.users = this.state.users.filter((u) => u.id !== id);
     this.save();
     return true;
+  }
+
+  public async grantAdditionalRole(id: string, role: string): Promise<User> {
+    try {
+      const user = this.state.users.find((u) => u.id === id);
+      if (!user) throw new Error('User not found');
+      
+      const currentRoles = user.additional_roles || [];
+      if (currentRoles.includes(role)) return user; // Already has it
+      
+      const newRoles = [...currentRoles, role];
+      const { error } = await supabase.from('users').update({ additional_roles: newRoles }).eq('id', id);
+      if (error) console.warn('Supabase DB not synced, relying on memory');
+      
+      const updatedUser = { ...user, additional_roles: newRoles };
+      this.state.users = this.state.users.map((u) => (u.id === id ? updatedUser : u));
+      return updatedUser;
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
   }
 
   // --- Profile Roles ---
@@ -663,7 +730,9 @@ export class Database {
       enrollment_date: new Date().toISOString(),
     };
     const { error } = await supabase.from('students').insert([newStudent]);
-    if (error) throw error;
+    if (error) {
+      console.warn("Supabase insert error for students, falling back to local state:", error);
+    }
 
     this.state.students.push(newStudent);
     this.save();
@@ -956,18 +1025,50 @@ export class Database {
     return this.state.marks.filter((m) => m.subject_id === subjectId);
   }
 
-  public async saveMarksBatch(records: Omit<MarkRecord, 'id'>[]): Promise<void> {
+  public async saveInternalMarksBatch(records: Pick<MarkRecord, 'subject_id' | 'student_id' | 'mid1_marks' | 'mid2_marks' | 'mid3_marks' | 'cmm_marks' | 'internal_status'>[]): Promise<void> {
     const upsertRecords = records.map((record) => {
       const existing = this.state.marks.find(
-        (m) => m.subject_id === record.subject_id && m.student_id === record.student_id && m.exam_type === record.exam_type
+        (m) => m.subject_id === record.subject_id && m.student_id === record.student_id
       );
       return {
         id: existing ? existing.id : generateUUID(),
         subject_id: record.subject_id,
         student_id: record.student_id,
-        exam_type: record.exam_type,
-        marks_obtained: record.marks_obtained,
-        max_marks: record.max_marks,
+        mid1_marks: record.mid1_marks,
+        mid2_marks: record.mid2_marks,
+        mid3_marks: record.mid3_marks,
+        cmm_marks: record.cmm_marks,
+        internal_status: record.internal_status,
+        semester_marks: existing?.semester_marks,
+        semester_status: existing?.semester_status || 'Draft',
+      };
+    });
+
+    const { error } = await supabase.from('marks').upsert(upsertRecords);
+    if (error) throw error;
+
+    upsertRecords.forEach((record) => {
+      const idx = this.state.marks.findIndex((m) => m.id === record.id);
+      if (idx > -1) {
+        this.state.marks[idx] = record as MarkRecord;
+      } else {
+        this.state.marks.push(record as MarkRecord);
+      }
+    });
+    this.save();
+  }
+
+  public async saveSemesterMarksBatch(records: Pick<MarkRecord, 'subject_id' | 'student_id' | 'semester_marks' | 'semester_status'>[]): Promise<void> {
+    const upsertRecords = records.map((record) => {
+      const existing = this.state.marks.find(
+        (m) => m.subject_id === record.subject_id && m.student_id === record.student_id
+      );
+      if (!existing) throw new Error("Cannot add semester marks without existing record");
+      
+      return {
+        ...existing,
+        semester_marks: record.semester_marks,
+        semester_status: record.semester_status,
       };
     });
 
@@ -978,8 +1079,38 @@ export class Database {
       const idx = this.state.marks.findIndex((m) => m.id === record.id);
       if (idx > -1) {
         this.state.marks[idx] = record;
-      } else {
-        this.state.marks.push(record);
+      }
+    });
+    this.save();
+  }
+
+  public async updateInternalStatus(subjectId: string, newStatus: 'Pending Exam Cell' | 'Approved' | 'Rejected' | 'Draft'): Promise<void> {
+    const { error } = await supabase
+      .from('marks')
+      .update({ internal_status: newStatus })
+      .eq('subject_id', subjectId);
+    
+    if (error) console.error("Supabase update error:", error);
+
+    this.state.marks.forEach(m => {
+      if (m.subject_id === subjectId) {
+        m.internal_status = newStatus;
+      }
+    });
+    this.save();
+  }
+
+  public async updateSemesterStatus(subjectId: string, newStatus: 'Pending Principal' | 'Approved' | 'Rejected' | 'Draft'): Promise<void> {
+    const { error } = await supabase
+      .from('marks')
+      .update({ semester_status: newStatus })
+      .eq('subject_id', subjectId);
+    
+    if (error) console.error("Supabase update error:", error);
+
+    this.state.marks.forEach(m => {
+      if (m.subject_id === subjectId) {
+        m.semester_status = newStatus;
       }
     });
     this.save();

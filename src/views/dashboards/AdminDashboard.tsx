@@ -22,7 +22,9 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  UserCheck
+  UserCheck,
+  Download,
+  Upload
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -50,6 +52,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
   // Form Fields - Department
   const [deptName, setDeptName] = useState('');
@@ -60,7 +63,9 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [userEmail, setUserEmail] = useState('');
   const [userFullName, setUserFullName] = useState('');
   const [userPassword, setUserPassword] = useState('');
-  const [userRole, setUserRole] = useState<'principal' | 'hod' | 'faculty'>('principal');
+  const [userRole, setUserRole] = useState<'principal' | 'hod' | 'faculty' | 'exam_cell' | 'library'>('principal');
+  const [isAssignExisting, setIsAssignExisting] = useState(false);
+  const [assignUserId, setAssignUserId] = useState('');
   const [userDeptId, setUserDeptId] = useState('');
   const [userPhone, setUserPhone] = useState('');
   const [userQual, setUserQual] = useState('');
@@ -211,6 +216,31 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   // User Actions
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isAssignExisting) {
+      if (!assignUserId || !userRole) {
+        showToast('Please select a user and role to assign.', 'warning');
+        return;
+      }
+      try {
+        await db.grantAdditionalRole(assignUserId, userRole);
+        await db.logAction(
+          currentUser!.id,
+          currentUser!.email,
+          currentUser!.role,
+          'Assign Role',
+          `Granted ${userRole.toUpperCase()} role to existing user ID: ${assignUserId}`
+        );
+        showToast(`Successfully assigned ${userRole} to existing staff member.`, 'success');
+        setActiveModal(null);
+        triggerStateRefresh();
+        setAssignUserId('');
+      } catch (err: any) {
+        showToast(err.message || 'Failed to assign role.', 'error');
+      }
+      return;
+    }
+
     if (!userEmail || !userFullName || !userPassword) return;
 
     // Check email uniqueness
@@ -261,6 +291,8 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
           joining_date: new Date().toISOString().split('T')[0],
         });
       }
+      // Note: Exam Cell and Library do not currently require separate profile tables.
+
 
       await db.logAction(
         currentUser!.id,
@@ -343,6 +375,41 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     }
   };
 
+  const handleBulkDeleteUsers = async () => {
+    if (selectedUserIds.length === 0) return;
+    if (window.confirm(`Are you sure you want to delete ${selectedUserIds.length} users? This action is irreversible.`)) {
+      try {
+        for (const id of selectedUserIds) {
+          const u = dbState.users.find(user => user.id === id);
+          if (u) {
+            await db.deleteUser(id);
+            await db.logAction(
+              currentUser!.id,
+              currentUser!.email,
+              currentUser!.role,
+              'Delete User',
+              `Deleted account for ${u.full_name}`
+            );
+          }
+        }
+        showToast(`${selectedUserIds.length} user accounts deleted.`, 'success');
+        setSelectedUserIds([]);
+        triggerStateRefresh();
+      } catch (err: any) {
+        showToast(err.message || 'Failed to bulk delete users.', 'error');
+      }
+    }
+  };
+
+  const handleSelectAllUsers = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const currentPageIds = paginateList(filteredUsers).map(u => u.id);
+    if (e.target.checked) {
+      setSelectedUserIds([...new Set([...selectedUserIds, ...currentPageIds])]);
+    } else {
+      setSelectedUserIds(selectedUserIds.filter(id => !currentPageIds.includes(id)));
+    }
+  };
+
   // Helpers
   const getDeptName = (id: string) => {
     return dbState.departments.find((d) => d.id === id)?.name || 'N/A';
@@ -359,7 +426,13 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     (u) =>
       (u.full_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
         u.email.toLowerCase().includes(searchFilter.toLowerCase())) &&
-      u.role !== 'admin' // Exclude admin themselves from standard listings
+      u.role !== 'admin' && // Exclude admin themselves from standard listings
+      (activeTab === 'users' || 
+       (activeTab === 'principals' && u.role === 'principal') ||
+       (activeTab === 'hods' && u.role === 'hod') ||
+       (activeTab === 'faculty' && u.role === 'faculty') ||
+       (activeTab === 'library' && (u.role === 'library' || u.additional_roles?.includes('library'))) ||
+       (activeTab === 'exam_cell' && (u.role === 'exam_cell' || u.additional_roles?.includes('exam_cell'))))
   );
 
   const filteredStudents = dbState.students.filter(
@@ -599,19 +672,54 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
       )}
 
       {/* 3. USERS MANAGEMENT TAB */}
-      {activeTab === 'users' && (
+      {(activeTab === 'users' || activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty' || activeTab === 'library' || activeTab === 'exam_cell') && (
         <div className="glass p-6 rounded-2xl border border-navy-100 dark:border-navy-800 space-y-6 animate-fade-in">
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="text-navy-900 dark:text-white font-bold text-lg">Staff & Faculty Directory</h3>
+              <h3 className="text-navy-900 dark:text-white font-bold text-lg">
+                {activeTab === 'principals' ? 'Principal Management' : 
+                 activeTab === 'hods' ? 'HOD Management' : 
+                 activeTab === 'faculty' ? 'Faculty Management' : 
+                 activeTab === 'library' ? 'Library Management' : 
+                 activeTab === 'exam_cell' ? 'Exam Cell Management' : 
+                 'Staff & Faculty Directory'}
+              </h3>
               <p className="text-xs text-navy-400">Manage login credentials and system-wide roles</p>
             </div>
-            <button
-              onClick={() => setActiveModal('create_user')}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-bold shadow-md shadow-primary-500/20"
-            >
-              <Plus size={16} /> Register Staff
-            </button>
+            <div className="flex gap-2">
+              {(activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty') && (
+                <>
+                  <button className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-navy-800 dark:hover:bg-navy-700 text-white rounded-xl text-sm font-bold shadow-md transition-colors">
+                    <Download size={16} /> Template
+                  </button>
+                  <button className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-navy-800 dark:hover:bg-navy-700 text-white rounded-xl text-sm font-bold shadow-md transition-colors">
+                    <Upload size={16} /> Bulk Upload
+                  </button>
+                </>
+              )}
+              {selectedUserIds.length > 0 && (
+                <button
+                  onClick={handleBulkDeleteUsers}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold shadow-md shadow-red-500/20 transition-colors"
+                >
+                  <Trash2 size={16} /> Delete Selected ({selectedUserIds.length})
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  let defaultRole = 'principal';
+                  if (activeTab === 'hods') defaultRole = 'hod';
+                  if (activeTab === 'faculty') defaultRole = 'faculty';
+                  if (activeTab === 'library') defaultRole = 'library';
+                  if (activeTab === 'exam_cell') defaultRole = 'exam_cell';
+                  setUserRole(defaultRole as any);
+                  setActiveModal('create_user');
+                }}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-bold shadow-md shadow-primary-500/20 transition-colors"
+              >
+                <Plus size={16} /> Register Staff
+              </button>
+            </div>
           </div>
 
           {filteredUsers.length === 0 ? (
@@ -625,6 +733,14 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-navy-800 text-navy-400 font-bold text-xs uppercase tracking-wider">
+                    <th className="pb-3 pl-2 w-10">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                        onChange={handleSelectAllUsers}
+                        checked={paginateList(filteredUsers).length > 0 && paginateList(filteredUsers).every(u => selectedUserIds.includes(u.id))}
+                      />
+                    </th>
                     <th className="pb-3 pl-2">Name</th>
                     <th className="pb-3">Email</th>
                     <th className="pb-3">Role</th>
@@ -647,6 +763,20 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
 
                     return (
                       <tr key={u.id} className="text-navy-900 dark:text-navy-200 hover:bg-slate-50/50 dark:hover:bg-navy-900/30">
+                        <td className="py-3.5 pl-2">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                            checked={selectedUserIds.includes(u.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedUserIds([...selectedUserIds, u.id]);
+                              } else {
+                                setSelectedUserIds(selectedUserIds.filter(id => id !== u.id));
+                              }
+                            }}
+                          />
+                        </td>
                         <td className="py-3.5 pl-2 font-bold">{u.full_name}</td>
                         <td className="py-3.5 text-xs font-mono">{u.email}</td>
                         <td className="py-3.5">
@@ -955,6 +1085,29 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
             {/* C. Create User */}
             {activeModal === 'create_user' && (
               <form onSubmit={handleCreateUser} className="space-y-4">
+                {(activeTab === 'exam_cell' || activeTab === 'library') && (
+                  <div className="flex justify-center bg-slate-100 dark:bg-navy-950 p-1 rounded-xl border border-slate-200 dark:border-navy-800 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsAssignExisting(false)}
+                      className={`flex-1 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                        !isAssignExisting ? 'bg-white dark:bg-navy-800 text-primary-600 shadow-sm' : 'text-navy-500'
+                      }`}
+                    >
+                      New Staff
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAssignExisting(true)}
+                      className={`flex-1 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                        isAssignExisting ? 'bg-white dark:bg-navy-800 text-primary-600 shadow-sm' : 'text-navy-500'
+                      }`}
+                    >
+                      Existing Staff
+                    </button>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Role</label>
@@ -963,13 +1116,19 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                       onChange={(e) => setUserRole(e.target.value as any)}
                       className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
                     >
-                      <option value="principal">Principal</option>
-                      <option value="hod">HOD</option>
-                      <option value="faculty">Faculty</option>
+                      {(activeTab === 'users' || activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty') && (
+                        <>
+                          <option value="principal">Principal</option>
+                          <option value="hod">HOD</option>
+                          <option value="faculty">Faculty</option>
+                        </>
+                      )}
+                      {activeTab === 'library' && <option value="library">Library</option>}
+                      {activeTab === 'exam_cell' && <option value="exam_cell">Exam Cell</option>}
                     </select>
                   </div>
                   {/* Department Field (Conditional for HOD & Faculty) */}
-                  {userRole !== 'principal' && (
+                  {(userRole === 'hod' || userRole === 'faculty') && (
                     <div>
                       <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Department</label>
                       <select
@@ -1013,61 +1172,95 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Password</label>
-                    <input
-                      type="password"
-                      required
-                      value={userPassword}
-                      onChange={(e) => setUserPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Qualifications</label>
-                    <input
-                      type="text"
-                      value={userQual}
-                      onChange={(e) => setUserQual(e.target.value)}
-                      placeholder="M.Pharm, Ph.D"
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Phone</label>
-                    <input
-                      type="text"
-                      value={userPhone}
-                      onChange={(e) => setUserPhone(e.target.value)}
-                      placeholder="9876543210"
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                    />
-                  </div>
-                  {userRole === 'faculty' && (
-                    <div>
-                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Designation</label>
-                      <input
-                        type="text"
-                        value={userDesg}
-                        onChange={(e) => setUserDesg(e.target.value)}
-                        placeholder="e.g. Associate Professor"
-                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                      />
+                {!isAssignExisting && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={userPassword}
+                          onChange={(e) => setUserPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Qualifications</label>
+                        <input
+                          type="text"
+                          value={userQual}
+                          onChange={(e) => setUserQual(e.target.value)}
+                          placeholder="M.Pharm, Ph.D"
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
                     </div>
-                  )}
-                </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm mt-2"
-                >
-                  Create Account
-                </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Phone</label>
+                        <input
+                          type="text"
+                          value={userPhone}
+                          onChange={(e) => setUserPhone(e.target.value)}
+                          placeholder="9876543210"
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
+                      {userRole === 'faculty' && (
+                        <div>
+                          <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Designation</label>
+                          <input
+                            type="text"
+                            value={userDesg}
+                            onChange={(e) => setUserDesg(e.target.value)}
+                            placeholder="e.g. Associate Professor"
+                            className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm mt-2"
+                    >
+                      Create Account
+                    </button>
+                  </>
+                )}
+
+                {isAssignExisting && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Select Existing Staff</label>
+                      <select
+                        required
+                        value={assignUserId}
+                        onChange={(e) => setAssignUserId(e.target.value)}
+                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                      >
+                        <option value="">-- Select Faculty / HOD --</option>
+                        {dbState.users
+                          .filter(u => u.role === 'faculty' || u.role === 'hod')
+                          .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.full_name} ({u.role.toUpperCase()})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm"
+                    >
+                      Assign Role to Staff
+                    </button>
+                  </>
+                )}
               </form>
             )}
 

@@ -49,6 +49,27 @@ export const SubjectManagementTab: React.FC<Props> = ({ departmentId, isPrincipa
     ? dbState.subject_assignments
     : myFacultyProfiles.map(f => dbState.subject_assignments.filter(sa => sa.faculty_id === f.id)).flat();
 
+  const getYearsForCourse = (course: string) => {
+    if (!course) return [];
+    if (course === 'M.PHARM') return ['I Year', 'II Year'];
+    if (course === 'PHARM.D') return ['I Year', 'II Year', 'III Year', 'IV Year', 'V Year', 'VI Year'];
+    return ['I Year', 'II Year', 'III Year', 'IV Year']; // B.PHARM
+  };
+
+  const getSemestersForCourse = (course: string) => {
+    if (!course) return [];
+    if (course === 'PHARM.D') return [];
+    if (course === 'M.PHARM') return ['I Semester', 'II Semester', 'III Semester', 'IV Semester'];
+    return ['I Semester', 'II Semester', 'III Semester', 'IV Semester', 'V Semester', 'VI Semester', 'VII Semester', 'VIII Semester']; // B.PHARM
+  };
+
+  const groupedSubjects = mySubjects.reduce((acc, sub) => {
+    const course = sub.course || 'Unassigned';
+    if (!acc[course]) acc[course] = [];
+    acc[course].push(sub);
+    return acc;
+  }, {} as Record<string, Subject[]>);
+
   // --- Actions ---
 
   const handleCreateSubject = async (e: React.FormEvent) => {
@@ -263,23 +284,43 @@ export const SubjectManagementTab: React.FC<Props> = ({ departmentId, isPrincipa
               No subjects configured. Use bulk upload or add manually.
             </div>
           ) : (
-            <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-2">
-              {mySubjects.map((sub) => (
-                <div key={sub.id} className="p-3.5 bg-slate-50 dark:bg-navy-950/60 rounded-xl border border-slate-100 dark:border-navy-850 flex justify-between items-center text-xs font-semibold">
-                  <div>
-                    <p className="text-navy-950 dark:text-white font-bold">{sub.name}</p>
-                    <p className="text-[10px] text-navy-400 mt-0.5">
-                      {sub.course && <span className="font-bold text-primary-500 mr-1">{sub.course}</span>}
-                      {sub.code} • {sub.credits} Credits 
-                      {(sub.year || sub.semester) && ` • ${sub.year || ''} ${sub.semester || ''}`}
-                    </p>
+            <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2">
+              {Object.entries(groupedSubjects).map(([course, subjects]) => (
+                <div key={course} className="space-y-3">
+                  <h5 className="font-extrabold text-sm text-primary-600 dark:text-primary-400 border-b border-primary-500/20 pb-1">
+                    {course}
+                  </h5>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-navy-800 text-navy-400 font-bold uppercase tracking-wider">
+                          <th className="pb-2 pl-2">Subject Code</th>
+                          <th className="pb-2">Subject Name</th>
+                          <th className="pb-2">Year / Sem</th>
+                          <th className="pb-2">Credits</th>
+                          <th className="pb-2 pr-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-navy-850">
+                        {subjects.map((sub) => (
+                          <tr key={sub.id} className="text-navy-950 dark:text-navy-200 hover:bg-slate-50/50 dark:hover:bg-navy-900/30">
+                            <td className="py-2.5 pl-2 font-mono font-bold text-primary-500">{sub.code}</td>
+                            <td className="py-2.5 font-bold">{sub.name}</td>
+                            <td className="py-2.5">{sub.year || '-'} {sub.semester ? `/ ${sub.semester}` : ''}</td>
+                            <td className="py-2.5">{sub.credits}</td>
+                            <td className="py-2.5 pr-2 text-right">
+                              <button
+                                onClick={() => handleDeleteSubject(sub.id, sub.code)}
+                                className="p-1.5 bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <button
-                    onClick={() => handleDeleteSubject(sub.id, sub.code)}
-                    className="p-1 text-navy-400 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 size={14} />
-                  </button>
                 </div>
               ))}
             </div>
@@ -411,36 +452,32 @@ export const SubjectManagementTab: React.FC<Props> = ({ departmentId, isPrincipa
                       required
                       value={subYear}
                       onChange={(e) => setSubYear(e.target.value)}
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                      disabled={!subCourse}
+                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white disabled:opacity-50"
                     >
                       <option value="">-- Select Year --</option>
-                      <option value="I Year">I Year</option>
-                      <option value="II Year">II Year</option>
-                      <option value="III Year">III Year</option>
-                      <option value="IV Year">IV Year</option>
-                      <option value="V Year">V Year</option>
-                      <option value="VI Year">VI Year</option>
+                      {getYearsForCourse(subCourse).map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Semester</label>
-                    <select
-                      required
-                      value={subSemester}
-                      onChange={(e) => setSubSemester(e.target.value)}
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                    >
-                      <option value="">-- Select Semester --</option>
-                      <option value="I Semester">I Semester</option>
-                      <option value="II Semester">II Semester</option>
-                      <option value="III Semester">III Semester</option>
-                      <option value="IV Semester">IV Semester</option>
-                      <option value="V Semester">V Semester</option>
-                      <option value="VI Semester">VI Semester</option>
-                      <option value="VII Semester">VII Semester</option>
-                      <option value="VIII Semester">VIII Semester</option>
-                    </select>
-                  </div>
+                  {subCourse !== 'PHARM.D' && (
+                    <div>
+                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Semester</label>
+                      <select
+                        required
+                        value={subSemester}
+                        onChange={(e) => setSubSemester(e.target.value)}
+                        disabled={!subCourse}
+                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white disabled:opacity-50"
+                      >
+                        <option value="">-- Select Semester --</option>
+                        {getSemestersForCourse(subCourse).map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <button

@@ -9,6 +9,7 @@ import { PrincipalDashboard } from './dashboards/PrincipalDashboard';
 import { HODDashboard } from './dashboards/HODDashboard';
 import { FacultyDashboard } from './dashboards/FacultyDashboard';
 import { StudentDashboard } from './dashboards/StudentDashboard';
+import { ExamCellDashboard } from './dashboards/ExamCellDashboard';
 import { CollegeLogo } from '../components/Icons';
 import {
   LayoutDashboard,
@@ -27,13 +28,16 @@ import {
   CalendarDays,
   FileCheck2,
   ShieldCheck,
-  Banknote
+  Banknote,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 
 export const DashboardContainer: React.FC = () => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, studentProfile, facultyProfile, hodProfile, principalProfile } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [notices, setNotices] = useState<Notice[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -107,21 +111,33 @@ export const DashboardContainer: React.FC = () => {
 
   // Sidebar navigation options by role
   const getNavLinks = () => {
+    let links: any[] = [];
     const common = [
       { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
     ];
 
     if (currentUser.role === 'admin') {
-      return [
+      links = [
         ...common,
         { id: 'departments', label: 'Departments', icon: Building },
-        { id: 'users', label: 'Users Management', icon: UserCheck },
-        { id: 'students', label: 'Student Management', icon: GraduationCap },
+        { 
+          id: 'users', 
+          label: 'User Management', 
+          icon: UserCheck,
+          subLinks: [
+            { id: 'principals', label: 'Principal Management' },
+            { id: 'hods', label: 'HOD Management' },
+            { id: 'faculty', label: 'Faculty Management' },
+            { id: 'library', label: 'Library Management' },
+            { id: 'exam_cell', label: 'Exam Cell Management' },
+            { id: 'students', label: 'Student Management' }
+          ]
+        },
         { id: 'attendance', label: 'Student Attendance', icon: FileCheck2 },
         { id: 'database', label: 'Database & Sync', icon: ShieldCheck },
       ];
     } else if (currentUser.role === 'principal') {
-      return [
+      links = [
         ...common,
         { id: 'hods', label: 'HOD Directory', icon: Users },
         { id: 'students', label: 'Student Management', icon: GraduationCap },
@@ -131,9 +147,10 @@ export const DashboardContainer: React.FC = () => {
         { id: 'salaries', label: 'Salary Management', icon: Banknote },
         { id: 'notices', label: 'Notices', icon: Bell },
         { id: 'approvals', label: 'Approvals', icon: FileCheck2 },
+        { id: 'marks_approval', label: 'Marks Approval', icon: FileCheck2 },
       ];
     } else if (currentUser.role === 'hod') {
-      return [
+      links = [
         ...common,
         { id: 'faculty', label: 'Faculty Management', icon: UserCheck },
         { id: 'students', label: 'Student Management', icon: GraduationCap },
@@ -142,7 +159,7 @@ export const DashboardContainer: React.FC = () => {
         { id: 'leaves', label: 'Leave Requests', icon: FileCheck2 },
       ];
     } else if (currentUser.role === 'faculty') {
-      return [
+      links = [
         ...common,
         { id: 'timetable', label: 'My Timetable', icon: CalendarDays },
         { id: 'students', label: 'Student Management', icon: GraduationCap },
@@ -151,26 +168,81 @@ export const DashboardContainer: React.FC = () => {
         { id: 'leaves', label: 'Apply Leave', icon: CalendarDays },
       ];
     } else if (currentUser.role === 'student') {
-      return [
+      links = [
         ...common,
         { id: 'timetable', label: 'My Timetable', icon: CalendarDays },
+        { id: 'attendance', label: 'My Attendance', icon: FileCheck2 },
+        { id: 'marks', label: 'My Marks', icon: BookOpen },
       ];
+    } else if (currentUser.role === 'exam_cell') {
+      links = [
+        ...common,
+        { id: 'exam_cell', label: 'Exam Management', icon: BookOpen },
+      ];
+    } else if (currentUser.role === 'library') {
+      links = [
+        ...common,
+        { id: 'library', label: 'Library Books', icon: BookOpen },
+      ];
+    } else {
+      links = common;
     }
-    return common;
+
+    if (currentUser.additional_roles) {
+      if (currentUser.additional_roles.includes('exam_cell') && !links.find(l => l.id === 'exam_cell')) {
+        links.push({ id: 'exam_cell', label: 'Exam Management (Add-on)', icon: BookOpen });
+      }
+      if (currentUser.additional_roles.includes('library') && !links.find(l => l.id === 'library')) {
+        links.push({ id: 'library', label: 'Library Books (Add-on)', icon: BookOpen });
+      }
+    }
+
+    return links;
   };
 
   const navLinks = getNavLinks();
 
   const handleTabChange = (tabId: string) => {
+    if (tabId === 'profile') {
+      setShowProfileModal(true);
+      setMobileMenuOpen(false);
+      return;
+    }
     setActiveTab(tabId);
     setMobileMenuOpen(false);
   };
 
+  const toggleMenuExpand = (menuId: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(menuId) ? prev.filter(id => id !== menuId) : [...prev, menuId]
+    );
+  };
+
   // Render correct dashboard component
   const renderDashboard = () => {
+    // Admin always goes to AdminDashboard, regardless of tab
+    if (currentUser.role === 'admin') {
+      return <AdminDashboard activeTab={activeTab} searchFilter={searchQuery} onTabChange={setActiveTab} />;
+    }
+
+    // Override rendering if an add-on functional tab is active for non-admins
+    if (activeTab === 'exam_cell') {
+      return (
+        <div className="p-8 max-w-7xl mx-auto">
+          <ExamCellDashboard activeTab={activeTab} />
+        </div>
+      );
+    }
+    if (activeTab === 'library') {
+      return (
+        <div className="p-8 max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
+          <h2 className="text-2xl font-black text-navy-900 dark:text-white mb-2">Library Dashboard</h2>
+          <p className="text-navy-500 dark:text-navy-400">Library management modules are under construction.</p>
+        </div>
+      );
+    }
+
     switch (currentUser.role) {
-      case 'admin':
-        return <AdminDashboard activeTab={activeTab} searchFilter={searchQuery} onTabChange={setActiveTab} />;
       case 'principal':
         return <PrincipalDashboard activeTab={activeTab} searchFilter={searchQuery} onTabChange={setActiveTab} />;
       case 'hod':
@@ -183,8 +255,16 @@ export const DashboardContainer: React.FC = () => {
             <StudentDashboard activeTab={activeTab} />
           </div>
         );
+      case 'exam_cell':
+        return (
+          <div className="p-8 max-w-7xl mx-auto">
+            <ExamCellDashboard activeTab={activeTab === 'overview' ? 'exam_cell' : activeTab} />
+          </div>
+        );
+      case 'library':
+        return <div className="p-8">Please use the sidebar to navigate.</div>;
       default:
-        return <div>Dashboard component not found.</div>;
+        return <div className="p-8">Dashboard component not found.</div>;
     }
   };
 
@@ -208,20 +288,57 @@ export const DashboardContainer: React.FC = () => {
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
           {navLinks.map((link) => {
             const Icon = link.icon;
-            const isActive = activeTab === link.id;
+            // Check if active tab is one of the sublinks
+            const isSubLinkActive = link.subLinks?.some(sub => sub.id === activeTab);
+            const isActive = activeTab === link.id || isSubLinkActive;
+            const isExpanded = expandedMenus.includes(link.id) || isSubLinkActive;
+
             return (
-              <button
-                key={link.id}
-                onClick={() => handleTabChange(link.id)}
-                className={`w-full flex items-center gap-3.5 px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                  isActive
-                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/20'
-                    : 'text-navy-500 dark:text-navy-400 hover:bg-slate-100 dark:hover:bg-navy-800 hover:text-navy-900 dark:hover:text-white'
-                }`}
-              >
-                <Icon size={18} />
-                <span>{link.label}</span>
-              </button>
+              <div key={link.id}>
+                <button
+                  onClick={() => {
+                    if (link.subLinks) {
+                      toggleMenuExpand(link.id);
+                    } else {
+                      handleTabChange(link.id);
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                    isActive && !link.subLinks
+                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/20'
+                      : isActive && link.subLinks
+                      ? 'bg-primary-50 dark:bg-navy-800 text-primary-600 dark:text-primary-400'
+                      : 'text-navy-500 dark:text-navy-400 hover:bg-slate-100 dark:hover:bg-navy-800 hover:text-navy-900 dark:hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <Icon size={18} />
+                    <span>{link.label}</span>
+                  </div>
+                  {link.subLinks && (
+                    isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />
+                  )}
+                </button>
+                
+                {/* Submenu rendering */}
+                {link.subLinks && isExpanded && (
+                  <div className="mt-1 ml-4 pl-4 border-l-2 border-slate-100 dark:border-navy-800 space-y-1">
+                    {link.subLinks.map(sub => (
+                      <button
+                        key={sub.id}
+                        onClick={() => handleTabChange(sub.id)}
+                        className={`w-full text-left px-4 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                          activeTab === sub.id
+                            ? 'bg-primary-600 text-white shadow-md shadow-primary-500/20'
+                            : 'text-navy-500 dark:text-navy-400 hover:bg-slate-100 dark:hover:bg-navy-800 hover:text-navy-900 dark:hover:text-white'
+                        }`}
+                      >
+                        {sub.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -278,20 +395,55 @@ export const DashboardContainer: React.FC = () => {
           <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
             {navLinks.map((link) => {
               const Icon = link.icon;
-              const isActive = activeTab === link.id;
+              const isSubLinkActive = link.subLinks?.some(sub => sub.id === activeTab);
+              const isActive = activeTab === link.id || isSubLinkActive;
+              const isExpanded = expandedMenus.includes(link.id) || isSubLinkActive;
+              
               return (
-                <button
-                  key={link.id}
-                  onClick={() => handleTabChange(link.id)}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
-                    isActive
-                      ? 'bg-primary-600 text-white'
-                      : 'text-navy-500 dark:text-navy-400 hover:bg-slate-100 dark:hover:bg-navy-800 hover:text-navy-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Icon size={18} />
-                  <span>{link.label}</span>
-                </button>
+                <div key={link.id}>
+                  <button
+                    onClick={() => {
+                      if (link.subLinks) {
+                        toggleMenuExpand(link.id);
+                      } else {
+                        handleTabChange(link.id);
+                      }
+                    }}
+                    className={`w-full flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-xl transition-all ${
+                      isActive && !link.subLinks
+                        ? 'bg-primary-600 text-white'
+                        : isActive && link.subLinks
+                        ? 'bg-primary-50 dark:bg-navy-800 text-primary-600 dark:text-primary-400'
+                        : 'text-navy-500 dark:text-navy-400 hover:bg-slate-100 dark:hover:bg-navy-800 hover:text-navy-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <Icon size={18} />
+                      <span>{link.label}</span>
+                    </div>
+                    {link.subLinks && (
+                      isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />
+                    )}
+                  </button>
+
+                  {link.subLinks && isExpanded && (
+                    <div className="mt-1 ml-4 pl-4 border-l-2 border-slate-100 dark:border-navy-800 space-y-1">
+                      {link.subLinks.map(sub => (
+                        <button
+                          key={sub.id}
+                          onClick={() => handleTabChange(sub.id)}
+                          className={`w-full text-left px-4 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                            activeTab === sub.id
+                              ? 'bg-primary-600 text-white'
+                              : 'text-navy-500 dark:text-navy-400 hover:bg-slate-100 dark:hover:bg-navy-800 hover:text-navy-900 dark:hover:text-white'
+                          }`}
+                        >
+                          {sub.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </nav>
@@ -432,6 +584,54 @@ export const DashboardContainer: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleUpdateProfile} className="p-5 space-y-4">
+              {/* Role-Specific Read-Only Details */}
+              {studentProfile && (
+                <div className="bg-slate-50 dark:bg-navy-950 p-3 rounded-lg text-xs space-y-2 mb-4 border border-slate-200 dark:border-navy-800">
+                  <h4 className="font-bold text-navy-800 dark:text-navy-200 mb-1">Academic Profile</h4>
+                  <div className="grid grid-cols-2 gap-2 text-navy-600 dark:text-navy-400">
+                    <p><span className="font-bold">Roll No:</span> {studentProfile.roll_number}</p>
+                    <p><span className="font-bold">DOB:</span> {studentProfile.dob || 'N/A'}</p>
+                    <p><span className="font-bold">Course:</span> {studentProfile.course}</p>
+                    {studentProfile.branch && <p><span className="font-bold">Branch:</span> {studentProfile.branch}</p>}
+                    <p><span className="font-bold">Year:</span> {studentProfile.year || 'N/A'}</p>
+                    <p><span className="font-bold">Semester:</span> {studentProfile.semester || 'N/A'}</p>
+                    <p><span className="font-bold">Batch:</span> {studentProfile.batch || 'N/A'}</p>
+                    <p><span className="font-bold">Phone:</span> {studentProfile.phone || 'N/A'}</p>
+                  </div>
+                </div>
+              )}
+
+              {hodProfile && (
+                <div className="bg-slate-50 dark:bg-navy-950 p-3 rounded-lg text-xs space-y-2 mb-4 border border-slate-200 dark:border-navy-800">
+                  <h4 className="font-bold text-navy-800 dark:text-navy-200 mb-1">Professional Profile</h4>
+                  <div className="grid grid-cols-2 gap-2 text-navy-600 dark:text-navy-400">
+                    <p className="col-span-2"><span className="font-bold">Qualifications:</span> {hodProfile.qualifications || 'N/A'}</p>
+                    <p className="col-span-2"><span className="font-bold">Phone:</span> {hodProfile.phone || 'N/A'}</p>
+                  </div>
+                </div>
+              )}
+
+              {facultyProfile && (
+                <div className="bg-slate-50 dark:bg-navy-950 p-3 rounded-lg text-xs space-y-2 mb-4 border border-slate-200 dark:border-navy-800">
+                  <h4 className="font-bold text-navy-800 dark:text-navy-200 mb-1">Professional Profile</h4>
+                  <div className="grid grid-cols-2 gap-2 text-navy-600 dark:text-navy-400">
+                    <p className="col-span-2"><span className="font-bold">Designation:</span> {facultyProfile.designation || 'N/A'}</p>
+                    <p className="col-span-2"><span className="font-bold">Qualifications:</span> {facultyProfile.qualifications || 'N/A'}</p>
+                    <p className="col-span-2"><span className="font-bold">Phone:</span> {facultyProfile.phone || 'N/A'}</p>
+                  </div>
+                </div>
+              )}
+
+              {principalProfile && (
+                <div className="bg-slate-50 dark:bg-navy-950 p-3 rounded-lg text-xs space-y-2 mb-4 border border-slate-200 dark:border-navy-800">
+                  <h4 className="font-bold text-navy-800 dark:text-navy-200 mb-1">Professional Profile</h4>
+                  <div className="grid grid-cols-2 gap-2 text-navy-600 dark:text-navy-400">
+                    <p className="col-span-2"><span className="font-bold">Qualifications:</span> {principalProfile.qualifications || 'N/A'}</p>
+                    <p className="col-span-2"><span className="font-bold">Phone:</span> {principalProfile.phone || 'N/A'}</p>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-navy-700 dark:text-navy-300 mb-1">Full Name</label>
                 <input

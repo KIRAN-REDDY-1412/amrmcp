@@ -299,6 +299,28 @@ export const PrincipalDashboard: React.FC<DashboardProps> = ({ activeTab, search
     }
   };
 
+  const handleApproveMarksPrincipal = async (subjectId: string) => {
+    try {
+      await db.updateSemesterStatus(subjectId, 'Approved');
+      showToast('Semester marks approved and released to students.', 'success');
+      triggerStateRefresh();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to approve marks.', 'error');
+    }
+  };
+
+  const handleRejectMarksPrincipal = async (subjectId: string) => {
+    if (window.confirm('Are you sure you want to reject these semester marks? They will be sent back to Exam Cell.')) {
+      try {
+        await db.updateSemesterStatus(subjectId, 'Rejected');
+        showToast('Semester marks rejected.', 'warning');
+        triggerStateRefresh();
+      } catch (err: any) {
+        showToast(err.message || 'Failed to reject marks.', 'error');
+      }
+    }
+  };
+
   // Filter listings
   const filteredHODs = dbState.users.filter(
     (u) =>
@@ -322,6 +344,21 @@ export const PrincipalDashboard: React.FC<DashboardProps> = ({ activeTab, search
   const pendingHODLeaves = dbState.leave_requests.filter((lr) => {
     const user = dbState.users.find((u) => u.id === lr.user_id);
     return lr.status === 'Pending' && user?.role === 'hod';
+  });
+
+  // Retrieve pending marks for principal approval
+  const pendingMarksForPrincipal = dbState.marks.filter(m => m.semester_status === 'Pending Principal');
+  const marksBatches: Record<string, { subjectId: string; studentCount: number }> = {};
+  
+  pendingMarksForPrincipal.forEach(m => {
+    const key = m.subject_id;
+    if (!marksBatches[key]) {
+      marksBatches[key] = {
+        subjectId: m.subject_id,
+        studentCount: 0
+      };
+    }
+    marksBatches[key].studentCount++;
   });
 
   return (
@@ -670,6 +707,68 @@ export const PrincipalDashboard: React.FC<DashboardProps> = ({ activeTab, search
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 4.1 MARKS APPROVAL */}
+      {activeTab === 'marks_approval' && (
+        <div className="glass p-6 rounded-2xl border border-navy-100 dark:border-navy-800 space-y-6 animate-fade-in">
+          <div>
+            <h3 className="text-navy-900 dark:text-white font-bold text-lg">Marks Approval</h3>
+            <p className="text-xs text-navy-400">Review marks verified by the Exam Cell before final publication.</p>
+          </div>
+
+          {Object.keys(marksBatches).length === 0 ? (
+            <div className="py-16 text-center text-navy-450">
+              <CheckCircle className="mx-auto w-10 h-10 mb-3 text-navy-300 dark:text-navy-700" />
+              <p className="font-medium text-sm">No pending marks for approval.</p>
+              <p className="text-xs mt-1">All verified marks have been processed.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-navy-800 text-navy-400 font-bold text-xs uppercase tracking-wider">
+                    <th className="pb-3 pl-2">Subject</th>
+                    <th className="pb-3">Course</th>
+                    <th className="pb-3">Students Graded</th>
+                    <th className="pb-3 pr-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-navy-850 font-medium">
+                  {Object.values(marksBatches).map((batch) => {
+                    const subject = dbState.subjects.find(s => s.id === batch.subjectId);
+                    return (
+                      <tr key={batch.subjectId} className="text-navy-950 dark:text-navy-200">
+                        <td className="py-3 pl-2">
+                          <p className="font-bold">{subject?.name || 'Unknown'}</p>
+                          <p className="text-[10px] text-primary-500 uppercase">{subject?.code}</p>
+                        </td>
+                        <td className="py-3 font-bold">{subject?.course}</td>
+                        <td className="py-3">{batch.studentCount} Students</td>
+                        <td className="py-3 pr-2 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => handleApproveMarksPrincipal(batch.subjectId)}
+                              className="px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg text-xs font-bold flex items-center gap-1"
+                            >
+                              <CheckCircle size={14} /> Approve
+                            </button>
+                            <button
+                              onClick={() => handleRejectMarksPrincipal(batch.subjectId)}
+                              className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-bold flex items-center gap-1"
+                            >
+                              <XCircle size={14} /> Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

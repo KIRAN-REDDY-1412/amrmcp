@@ -138,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('User record not found in system database.');
       }
 
-      if (user.role !== role) {
+      if (user.role !== role && (!user.additional_roles || !user.additional_roles.includes(role))) {
         await supabase.auth.signOut();
         throw new Error(`Account found, but not registered under ${role.toUpperCase()} role.`);
       }

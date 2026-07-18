@@ -22,6 +22,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
   const [studName, setStudName] = useState('');
   const [studRoll, setStudRoll] = useState('');
   const [studPassword, setStudPassword] = useState('');
+  const [studDob, setStudDob] = useState('');
   const [studCourse, setStudCourse] = useState('');
   const [studBranch, setStudBranch] = useState('');
   const [studYear, setStudYear] = useState('');
@@ -31,6 +32,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
   const [studBatch, setStudBatch] = useState('');
   const [studDeptId, setStudDeptId] = useState('');
   const [studPhone, setStudPhone] = useState('');
+  const [studEmail, setStudEmail] = useState('');
   const [studGuardian, setStudGuardian] = useState('');
 
   // Form Fields - Bulk Promote
@@ -74,7 +76,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studName || !studRoll || !studDeptId) return;
+    if (!studName || !studRoll) return;
 
     const rollExists = dbState.students.some((s) => s.roll_number.toLowerCase() === studRoll.toLowerCase());
     if (rollExists) {
@@ -84,7 +86,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
 
     try {
       // Create user auth record first
-      const studentEmail = `${studRoll.toLowerCase()}@student.amreddy.edu`;
+      const studentEmail = studEmail || `${studRoll.toLowerCase()}@student.amreddy.edu`;
       const newUser = await db.createUser({
         email: studentEmail,
         password: studPassword || 'Student@123',
@@ -96,6 +98,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
       await db.createStudent({
         name: studName,
         roll_number: studRoll,
+        dob: studDob,
         course: studCourse,
         branch: studCourse === 'M.PHARM' ? studBranch : undefined,
         year: studYear,
@@ -103,7 +106,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         section: studSection,
         academic_year: studAcademicYear,
         batch: studBatch,
-        department_id: studDeptId,
+        department_id: studDeptId || undefined,
         phone: studPhone,
         guardian_name: studGuardian,
         user_id: newUser.id,
@@ -124,6 +127,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
       setStudName('');
       setStudRoll('');
       setStudPassword('');
+      setStudDob('');
       setStudCourse('');
       setStudBranch('');
       setStudYear('');
@@ -133,6 +137,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
       setStudBatch('');
       setStudDeptId('');
       setStudPhone('');
+      setStudEmail('');
       setStudGuardian('');
     } catch (err: any) {
       console.error("Student Reg Error:", err);
@@ -144,6 +149,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
     setSelectedStudentId(s.id);
     setStudName(s.name);
     setStudRoll(s.roll_number);
+    setStudDob(s.dob || '');
     setStudCourse(s.course || '');
     setStudBranch(s.branch || '');
     setStudYear(s.year || '');
@@ -153,6 +159,11 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
     setStudBatch(s.batch || '');
     setStudDeptId(s.department_id);
     setStudPhone(s.phone);
+    
+    // Find the user to get their email
+    const studentUser = dbState.users.find(u => u.id === s.user_id);
+    setStudEmail(studentUser?.email || '');
+    
     setStudGuardian(s.guardian_name);
     setActiveModal('edit_student');
   };
@@ -168,6 +179,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
 
       await db.updateStudent(selectedStudentId, {
         name: studName,
+        dob: studDob,
         course: studCourse,
         branch: studCourse === 'M.PHARM' ? studBranch : undefined,
         year: studYear,
@@ -177,8 +189,14 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         batch: studBatch,
         phone: studPhone,
         guardian_name: studGuardian,
-        department_id: studDeptId,
+        department_id: studDeptId || undefined,
       });
+
+      // Update user email if it exists
+      const currentStudent = dbState.students.find(s => s.id === selectedStudentId);
+      if (currentStudent && studEmail) {
+        await db.updateUserEmail(currentStudent.user_id, studEmail);
+      }
 
       showToast('Student details saved.', 'success');
       setActiveModal(null);
@@ -240,6 +258,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         Name: "John Doe",
         "Roll Number": "Y26PH001",
         Password: "Student@123",
+        "Date of Birth": "2000-01-01",
         Course: "B.PHARM",
         Branch: "",
         Year: "I Year",
@@ -247,6 +266,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         Section: "A",
         "Academic Year": "2024-2025",
         Batch: "Y24",
+        Email: "alice@example.com",
         Phone: "9876543210",
         "Guardian Name": "Jane Doe"
       }
@@ -271,6 +291,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
       let successCount = 0;
       let skippedCount = 0;
       let errorCount = 0;
+      let lastErrorMsg = "";
 
       for (const row of rows) {
         try {
@@ -285,8 +306,9 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             finalDeptId = db.getRawState().departments[0].id;
           }
 
-          if (!name || !roll || !course || !finalDeptId) {
+          if (!name || !roll || !course) {
             errorCount++;
+            lastErrorMsg = "Missing required fields (Name, Roll Number, Course)";
             continue;
           }
 
@@ -299,7 +321,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             continue;
           }
 
-          const studentEmail = `${String(roll).toLowerCase()}@student.amreddy.edu`;
+          const studentEmail = row.Email || `${String(roll).toLowerCase()}@student.amreddy.edu`;
           const newUser = await db.createUser({
             email: studentEmail,
             password: String(password),
@@ -311,6 +333,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
           await db.createStudent({
             name: String(name),
             roll_number: String(roll),
+            dob: row["Date of Birth"] ? String(row["Date of Birth"]) : undefined,
             course: String(course),
             branch: row.Branch ? String(row.Branch) : undefined,
             year: row.Year ? String(row.Year) : undefined,
@@ -318,22 +341,23 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             section: row.Section ? String(row.Section) : undefined,
             academic_year: row["Academic Year"] ? String(row["Academic Year"]) : undefined,
             batch: row.Batch ? String(row.Batch) : undefined,
-            department_id: finalDeptId,
+            department_id: finalDeptId || undefined,
             phone: row.Phone ? String(row.Phone) : '',
             guardian_name: row["Guardian Name"] ? String(row["Guardian Name"]) : '',
             user_id: newUser.id,
           });
 
           successCount++;
-        } catch (err) {
+        } catch (err: any) {
           console.error("Bulk upload row error:", err);
           errorCount++;
+          lastErrorMsg = err.message || JSON.stringify(err);
         }
       }
 
       let toastMsg = `Registered ${successCount} students.`;
       if (skippedCount > 0) toastMsg += ` Skipped ${skippedCount} duplicates.`;
-      if (errorCount > 0) toastMsg += ` Failed ${errorCount}.`;
+      if (errorCount > 0) toastMsg += ` Failed ${errorCount}. Last error: ${lastErrorMsg}`;
 
       showToast(toastMsg, successCount > 0 ? 'success' : 'error');
       
@@ -360,9 +384,8 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
 
   const visibleStudents = dbState.students.filter(
     (s) =>
-      (isGlobal || s.department_id === myDeptId) &&
-      (s.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        s.roll_number.toLowerCase().includes(searchFilter.toLowerCase()))
+      s.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      s.roll_number.toLowerCase().includes(searchFilter.toLowerCase())
   );
 
   const getDeptName = (id: string) => {
@@ -409,12 +432,14 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                 setStudName('');
                 setStudRoll('');
                 setStudPassword('');
+                setStudDob('');
                 setStudCourse('');
                 setStudBranch('');
                 setStudYear('');
                 setStudSemester('');
                 setStudSection('');
                 setStudPhone('');
+                setStudEmail('');
                 setStudGuardian('');
                 setStudDeptId(isGlobal ? '' : myDeptId);
                 setActiveModal('create_student');
@@ -442,8 +467,9 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                   <th className="pb-3 pl-2">Name</th>
                   <th className="pb-3">Roll Number</th>
                   <th className="pb-3">Program Details</th>
-                  {isGlobal && <th className="pb-3">Department</th>}
-                  <th className="pb-3">Contact</th>
+                  <th className="pb-3">Batch Info</th>
+                  <th className="pb-3">DOB</th>
+                  <th className="pb-3">Contact & Credentials</th>
                   <th className="pb-3">Guardian</th>
                   <th className="pb-3 pr-2 text-right">Actions</th>
                 </tr>
@@ -463,8 +489,20 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                         )}
                       </div>
                     </td>
-                    {isGlobal && <td className="py-3.5 text-xs text-navy-500">{getDeptName(s.department_id)}</td>}
-                    <td className="py-3.5 text-xs text-navy-450">{s.phone || 'N/A'}</td>
+                    <td className="py-3.5">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-navy-900 dark:text-white">{s.batch || 'N/A'}</span>
+                        <span className="text-[10px] text-navy-500">{s.academic_year || 'N/A'}</span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 text-xs text-navy-450">{s.dob || 'N/A'}</td>
+                    <td className="py-3.5">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-navy-900 dark:text-navy-200" title="Phone">📞 {s.phone || 'N/A'}</span>
+                        <span className="text-[10px] text-navy-500" title="Email">✉️ {dbState.users.find(u => u.id === s.user_id)?.email || 'N/A'}</span>
+                        <span className="text-[10px] text-navy-500 font-mono" title="Password">🔑 {dbState.users.find(u => u.id === s.user_id)?.password || '••••••••'}</span>
+                      </div>
+                    </td>
                     <td className="py-3.5 text-xs text-navy-500">{s.guardian_name || 'N/A'}</td>
                     <td className="py-3.5 pr-2 text-right space-x-2">
                       <button
@@ -530,36 +568,32 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">
-                  {activeModal === 'edit_student' ? 'Reset Password (Optional)' : 'Login Password'}
-                </label>
-                <input
-                  type="password"
-                  required={activeModal === 'create_student'}
-                  value={studPassword}
-                  onChange={(e) => setStudPassword(e.target.value)}
-                  placeholder={activeModal === 'edit_student' ? "Leave blank to keep unchanged" : "••••••••"}
-                  className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white font-mono"
-                />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">
+                    {activeModal === 'edit_student' ? 'Reset Password (Optional)' : 'Login Password'}
+                  </label>
+                  <input
+                    type="password"
+                    required={activeModal === 'create_student'}
+                    value={studPassword}
+                    onChange={(e) => setStudPassword(e.target.value)}
+                    placeholder={activeModal === 'edit_student' ? "Leave blank to keep unchanged" : "••••••••"}
+                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Date of Birth</label>
+                  <input
+                    type="date"
+                    value={studDob}
+                    onChange={(e) => setStudDob(e.target.value)}
+                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                  />
+                </div>
               </div>
 
-              {isGlobal && (
-                <div>
-                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Department</label>
-                  <select
-                    required
-                    value={studDeptId}
-                    onChange={(e) => setStudDeptId(e.target.value)}
-                    className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                  >
-                    <option value="" disabled>Select Department</option>
-                    {dbState.departments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               <div>
                 <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Course</label>
@@ -699,6 +733,16 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Email</label>
+                <input
+                  type="email"
+                  value={studEmail}
+                  onChange={(e) => setStudEmail(e.target.value)}
+                  placeholder="e.g. alice@example.com"
+                  className="block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                />
+              </div>
               <div>
                 <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">Phone</label>
                 <input

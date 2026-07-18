@@ -120,20 +120,8 @@ export const DashboardContainer: React.FC = () => {
       links = [
         ...common,
         { id: 'departments', label: 'Departments', icon: Building },
-        { 
-          id: 'users', 
-          label: 'User Management', 
-          icon: UserCheck,
-          subLinks: [
-            { id: 'administrators', label: 'Administrator Management' },
-            { id: 'principals', label: 'Principal Management' },
-            { id: 'hods', label: 'HOD Management' },
-            { id: 'faculty', label: 'Faculty Management' },
-            { id: 'library', label: 'Library Management' },
-            { id: 'exam_cell', label: 'Exam Cell Management' },
-            { id: 'students', label: 'Student Management' }
-          ]
-        },
+        { id: 'users', label: 'User Management', icon: UserCheck },
+        { id: 'students', label: 'Student Management', icon: GraduationCap },
         { id: 'attendance', label: 'Student Attendance', icon: FileCheck2 },
         { id: 'database', label: 'Database & Sync', icon: ShieldCheck },
       ];

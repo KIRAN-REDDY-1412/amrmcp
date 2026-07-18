@@ -8,7 +8,7 @@ export interface User {
   id: string;
   email: string;
   password?: string; // Kept for interface compatibility
-  role: 'admin' | 'principal' | 'hod' | 'faculty' | 'student' | 'exam_cell' | 'library';
+  role: 'admin' | 'principal' | 'hod' | 'faculty' | 'student' | 'exam_cell' | 'library' | 'admission_cell';
   additional_roles?: string[];
   full_name: string;
   is_active: boolean;

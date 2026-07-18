@@ -30,7 +30,9 @@ import {
   ShieldCheck,
   Banknote,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Library,
+  UserPlus
 } from 'lucide-react';
 
 export const DashboardContainer: React.FC = () => {
@@ -172,6 +174,11 @@ export const DashboardContainer: React.FC = () => {
       links = [
         ...common,
         { id: 'library', label: 'Library Books', icon: BookOpen },
+      ];
+    } else if (currentUser.role === 'admission_cell') {
+      links = [
+        ...common,
+        { id: 'admissions', label: 'Admissions Dashboard', icon: UserPlus },
       ];
     } else {
       links = common;

@@ -20,7 +20,7 @@ export const LoginPage: React.FC = () => {
   const { login, registerSuperAdmin } = useAuth();
   const { showToast } = useToast();
   
-  const selectedRole = (route.params.role || 'faculty') as 'admin' | 'principal' | 'hod' | 'faculty' | 'student';
+  const selectedRole = (route.params.role || 'faculty') as 'admin' | 'principal' | 'hod' | 'faculty' | 'student' | 'admission_cell';
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -257,7 +257,7 @@ export const LoginPage: React.FC = () => {
           A.M. REDDY MEMORIAL COLLEGE
         </h2>
         <p className="mt-1 text-center text-sm text-primary-600 dark:text-primary-400 font-bold uppercase tracking-wider">
-          {selectedRole === 'admin' ? 'Administrator' : selectedRole} Login Portal
+          {selectedRole === 'admission_cell' ? 'Admission Cell' : selectedRole} Login Portal
         </p>
       </div>
 
@@ -268,7 +268,7 @@ export const LoginPage: React.FC = () => {
             <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs leading-relaxed flex items-start gap-2.5">
               <ShieldAlert size={16} className="mt-0.5 flex-shrink-0 animate-bounce" />
               <div>
-                <strong>No Accounts Found:</strong> The database is empty. Go back and select <strong>Administrator Login</strong> to initialize the Super Admin account first.
+                <strong>No Accounts Found:</strong> The database is empty. Go back and select <strong>Admin Login</strong> to initialize the Super Admin account first.
               </div>
             </div>
           )}

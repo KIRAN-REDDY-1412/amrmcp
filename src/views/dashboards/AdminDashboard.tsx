@@ -1290,6 +1290,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                       )}
                       {(activeTab === 'users' || activeTab === 'library') && <option value="library">Library</option>}
                       {(activeTab === 'users' || activeTab === 'exam_cell') && <option value="exam_cell">Exam Cell</option>}
+                      {(activeTab === 'users' || activeTab === 'admission_cell') && <option value="admission_cell">Admission Cell</option>}
                     </select>
                   </div>
                   {/* Department Field (Conditional for HOD & Faculty) */}

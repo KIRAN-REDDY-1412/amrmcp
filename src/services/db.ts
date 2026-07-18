@@ -496,7 +496,7 @@ export class Database {
       created_at: newUser.created_at
     }]);
     if (dbError) {
-      console.warn("Supabase insert error for users, falling back to local state:", dbError);
+      throw new Error(`Failed to create user in database: ${dbError.message}`);
     }
 
     // Ensure it's in local state
@@ -726,7 +726,7 @@ export class Database {
     };
     const { error } = await supabase.from('students').insert([newStudent]);
     if (error) {
-      console.warn("Supabase insert error for students, falling back to local state:", error);
+      throw new Error(`Failed to create student in database: ${error.message}`);
     }
 
     this.state.students.push(newStudent);

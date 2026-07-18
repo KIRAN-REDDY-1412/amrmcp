@@ -109,6 +109,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         phone: studPhone,
         guardian_name: studGuardian,
         user_id: newUser.id,
+        department_id: studDeptId,
       });
 
       await db.logAction(
@@ -188,6 +189,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         batch: studBatch,
         phone: studPhone,
         guardian_name: studGuardian,
+        department_id: studDeptId,
       });
 
       // Update user email if it exists

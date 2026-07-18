@@ -822,10 +822,17 @@ export class Database {
       updated_at: new Date().toISOString()
     }));
 
-    // Save to Supabase (assuming there's a table 'attendance_records')
-    const { error } = await supabase.from('attendance_records').insert(newRecords);
+    const supabasePayload = newRecords.map(r => ({
+      id: r.id,
+      subject_id: r.subject_id,
+      student_id: r.student_id,
+      date: r.date,
+      status: r.status
+    }));
+
+    const { error } = await supabase.from('attendance').insert(supabasePayload);
     if (error) {
-      console.error("Supabase insert error, falling back to local state:", error);
+      throw new Error(`Failed to save attendance to database: ${error.message}`);
     }
 
     this.state.attendance.push(...newRecords);
@@ -853,9 +860,9 @@ export class Database {
       modify_reason: reason
     };
 
-    const { error } = await supabase.from('attendance_records').update(updatedRecord).eq('id', id);
+    const { error } = await supabase.from('attendance').update({ status: updatedRecord.status }).eq('id', id);
     if (error) {
-      console.error("Supabase update error:", error);
+      throw new Error(`Failed to update attendance in database: ${error.message}`);
     }
 
     this.state.attendance[recordIndex] = updatedRecord;
@@ -1087,7 +1094,9 @@ export class Database {
       .update({ internal_status: newStatus })
       .eq('subject_id', subjectId);
     
-    if (error) console.error("Supabase update error:", error);
+    if (error) {
+      throw new Error(`Failed to update internal status in database: ${error.message}`);
+    }
 
     this.state.marks.forEach(m => {
       if (m.subject_id === subjectId) {
@@ -1103,7 +1112,9 @@ export class Database {
       .update({ semester_status: newStatus })
       .eq('subject_id', subjectId);
     
-    if (error) console.error("Supabase update error:", error);
+    if (error) {
+      throw new Error(`Failed to update semester status in database: ${error.message}`);
+    }
 
     this.state.marks.forEach(m => {
       if (m.subject_id === subjectId) {

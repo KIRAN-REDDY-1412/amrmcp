@@ -76,6 +76,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [userPhone, setUserPhone] = useState('');
   const [userQual, setUserQual] = useState('');
   const [userDesg, setUserDesg] = useState('');
+  const [userSpec, setUserSpec] = useState('');
 
   // Form Fields - Password Reset
   const [newPasswordVal, setNewPasswordVal] = useState('');
@@ -1181,7 +1182,6 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                 {activeModal === 'edit_dept' && 'Modify Department'}
                 {activeModal === 'create_user' && 'Register Staff User'}
                 {activeModal === 'reset_password' && 'Perform Password Override'}
-                {activeModal === 'register_student_erp' && 'Activate Student ERP'}
                 {activeModal === 'create_student' && 'Register Student Profile'}
                 {activeModal === 'edit_student' && 'Modify Student Record'}
                 {activeModal === 'view_users' && (viewRole === 'principal' ? 'Principals' : viewRole === 'hod' ? 'Head of Departments' : 'Faculty')}
@@ -1351,24 +1351,32 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                 </div>
 
                 {isAssignExisting && userRole !== 'student' ? (
-                  <div className="mt-4">
-                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Select User</label>
-                    <select
-                      required
-                      value={existingUserId}
-                      onChange={(e) => setExistingUserId(e.target.value)}
-                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                  <>
+                    <div className="mt-4">
+                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Select User</label>
+                      <select
+                        required
+                        value={assignUserId}
+                        onChange={(e) => setAssignUserId(e.target.value)}
+                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                      >
+                        <option value="">-- Select Existing User --</option>
+                        {dbState.users
+                          .filter((u) => u.role !== userRole)
+                          .map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.full_name} ({u.email}) - Current: {u.role}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm mt-4"
                     >
-                      <option value="">-- Select Existing User --</option>
-                      {dbState.users
-                        .filter((u) => u.role !== userRole)
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.full_name} ({u.email}) - Current: {u.role}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
+                      Assign Role to Staff
+                    </button>
+                  </>
                 ) : userRole === 'student' ? (
                   <>
                     <div className="grid grid-cols-2 gap-3 mt-4">
@@ -1395,6 +1403,12 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                         />
                       </div>
                     </div>
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm mt-4"
+                    >
+                      Activate ERP Account
+                    </button>
                   </>
                 ) : (
                   <>
@@ -1468,57 +1482,25 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                         />
                       </div>
                     </div>
-                  </>
-                )}
-                      {userRole === 'faculty' && (
-                        <div>
-                          <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Designation</label>
-                          <input
-                            type="text"
-                            value={userDesg}
-                            onChange={(e) => setUserDesg(e.target.value)}
-                            placeholder="e.g. Associate Professor"
-                            className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                          />
-                        </div>
-                      )}
-                    </div>
+
+                    {userRole === 'faculty' && (
+                      <div className="mt-4">
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Designation</label>
+                        <input
+                          type="text"
+                          value={userDesg}
+                          onChange={(e) => setUserDesg(e.target.value)}
+                          placeholder="e.g. Associate Professor"
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
+                    )}
 
                     <button
                       type="submit"
-                      className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm mt-2"
+                      className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm mt-6"
                     >
                       Create Account
-                    </button>
-                  </>
-                )}
-
-                {isAssignExisting && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Select Existing Staff</label>
-                      <select
-                        required
-                        value={assignUserId}
-                        onChange={(e) => setAssignUserId(e.target.value)}
-                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                      >
-                        <option value="">-- Select Faculty / HOD --</option>
-                        {dbState.users
-                          .filter(u => u.role === 'faculty' || u.role === 'hod')
-                          .map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.full_name} ({u.role.toUpperCase()})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm"
-                    >
-                      Assign Role to Staff
                     </button>
                   </>
                 )}

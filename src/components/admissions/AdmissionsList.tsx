@@ -12,7 +12,7 @@ export const AdmissionsList: React.FC = () => {
     // For admission cell, we are generally interested in ALL students, especially those 
     // newly added or missing roll numbers.
     const loadData = () => {
-      setStudents(db.getStudents());
+      db.getStudents().then(setStudents);
     };
     
     // Initial load

@@ -159,9 +159,9 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     const fileReader = new FileReader();
     if (e.target.files && e.target.files[0]) {
       fileReader.readAsText(e.target.files[0], 'UTF-8');
-      fileReader.onload = (event) => {
+      fileReader.onload = async (event) => {
         if (event.target && event.target.result) {
-          const success = db.restoreDatabase(event.target.result as string);
+          const success = await db.restoreDatabase(event.target.result as string);
           if (success) {
             triggerStateRefresh();
             showToast('Database restored successfully!', 'success');
@@ -472,7 +472,8 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     if (!userEmail || !userName || !userPassword) return;
 
     // Check email uniqueness
-    const emailExists = db.getUsers().some((u) => u.email.toLowerCase() === userEmail.toLowerCase());
+    const users = await db.getUsers();
+    const emailExists = users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase());
     if (emailExists) {
       showToast('Email is already registered.', 'error');
       return;

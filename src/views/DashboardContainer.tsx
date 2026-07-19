@@ -94,7 +94,7 @@ export const DashboardContainer: React.FC = () => {
 
   useEffect(() => {
     if (currentUser) {
-      setNotices(db.getNoticesForRole(currentUser.role));
+      db.getNoticesForRole(currentUser.role).then(setNotices);
     }
   }, [currentUser]);
 

@@ -31,7 +31,12 @@ export const FacultyClassAttendance: React.FC = () => {
   };
 
   const selectedDay = getDayOfWeek(date);
-  const myTimetable = db.getTimetableForFaculty(facultyProfile?.id || '').filter(t => t.day_of_week === selectedDay);
+  const [myTimetable, setMyTimetable] = useState<TimetableSlot[]>([]);
+  useEffect(() => {
+    db.getTimetableForFaculty(facultyProfile?.id || '').then(data => {
+      setMyTimetable(data.filter((t: any) => t.day_of_week === selectedDay));
+    });
+  }, [facultyProfile, selectedDay]);
 
   const handleSlotClick = (slot: TimetableSlot) => {
     const assignment = dbState.subject_assignments.find(sa => sa.id === slot.subject_assignment_id);
@@ -50,44 +55,47 @@ export const FacultyClassAttendance: React.FC = () => {
   useEffect(() => {
     if (!selectedSlot || !slotSubject) return;
 
-    // Load students for the selected subject's parameters and active section
-    const fetchedStudents = db.getStudentsByFilters({
-      course: slotSubject.course || '',
-      year: slotSubject.year || '',
-      semester: slotSubject.semester || '',
-      section: activeSection
-    });
-
-    setStudents(fetchedStudents);
-
-    // Check if attendance already exists
-    // Period name can just be the time slot for prototype, e.g., "09:00 - 10:00"
-    const periodName = `${selectedSlot.start_time} - ${selectedSlot.end_time}`;
-    const existing = db.getAttendanceByFilters(date, slotSubject.id, periodName);
-    
-    if (existing.length > 0) {
-      const recordsMap: Record<string, 'Present' | 'Absent'> = {};
-      let matchCount = 0;
-      
-      existing.forEach(record => {
-        if (fetchedStudents.some(s => s.id === record.student_id)) {
-          recordsMap[record.student_id] = record.status as 'Present' | 'Absent';
-          matchCount++;
-        }
+    const loadData = async () => {
+      // Load students for the selected subject's parameters and active section
+      const fetchedStudents = await db.getStudentsByFilters({
+        course: slotSubject.course || '',
+        year: slotSubject.year || '',
+        semester: slotSubject.semester || '',
+        section: activeSection
       });
 
-      if (matchCount > 0) {
-        setAttendanceData(recordsMap);
-        setIsSaved(true);
+      setStudents(fetchedStudents);
+
+      // Check if attendance already exists
+      // Period name can just be the time slot for prototype, e.g., "09:00 - 10:00"
+      const periodName = `${selectedSlot.start_time} - ${selectedSlot.end_time}`;
+      const existing = await db.getAttendanceByFilters(date, slotSubject.id, periodName);
+      
+      if (existing.length > 0) {
+        const recordsMap: Record<string, 'Present' | 'Absent'> = {};
+        let matchCount = 0;
+        
+        existing.forEach(record => {
+          if (fetchedStudents.some(s => s.id === record.student_id)) {
+            recordsMap[record.student_id] = record.status as 'Present' | 'Absent';
+            matchCount++;
+          }
+        });
+
+        if (matchCount > 0) {
+          setAttendanceData(recordsMap);
+          setIsSaved(true);
+        } else {
+          // No attendance marked for this specific section yet
+          setAttendanceData({});
+          setIsSaved(false);
+        }
       } else {
-        // No attendance marked for this specific section yet
         setAttendanceData({});
         setIsSaved(false);
       }
-    } else {
-      setAttendanceData({});
-      setIsSaved(false);
-    }
+    };
+    loadData();
   }, [selectedSlot, slotSubject, activeSection, date, dbState.attendance]);
 
   const handleMarkAll = (status: 'Present' | 'Absent') => {

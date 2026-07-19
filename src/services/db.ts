@@ -1,3 +1,20 @@
+export interface DatabaseState {
+  users: User[];
+  departments: Department[];
+  principals: Principal[];
+  hods: HOD[];
+  faculty: Faculty[];
+  students: Student[];
+  admission_documents: any[];
+  subjects: Subject[];
+  subject_assignments: SubjectAssignment[];
+  timetable: TimetableSlot[];
+  attendance: AttendanceRecord[];
+  marks: MarkRecord[];
+  leave_requests: LeaveRequest[];
+  notices: Notice[];
+  audit_logs: AuditLog[];
+}
 // Interfaces
 export interface User {
   id: string;
@@ -210,15 +227,32 @@ export const db = {
   // Add a dummy syncWithSupabase and getRawState to temporarily avoid crashing the app
   // before we refactor the components.
   syncWithSupabase: async () => {},
-  getRawState: () => ({
+  getRawState: (): DatabaseState => ({
     users: [], departments: [], principals: [], hods: [], faculty: [], students: [],
     admission_documents: [], subjects: [], subject_assignments: [], timetable: [],
     attendance: [], marks: [], leave_requests: [], notices: [], audit_logs: []
   }),
   resetDatabase: async () => {},
-  restoreDatabase: async () => false,
+  restoreDatabase: async (data: string) => false,
+  getAdmissionDocuments: async () => (await supabase.from('admission_documents').select('*')).data || [],
+  updateAdmissionDocumentStatus: async (id: string, status: string, notes?: string) => { await supabase.from('admission_documents').update({ status, notes }).eq('id', id); },
+  updateStudentStatus: async (id: string, status: string) => { await supabase.from('students').update({ status }).eq('id', id); },
+  getNoticesForRole: async (role: string) => {
+    const { data } = await supabase.from('notices').select('*').order('created_at', { ascending: false });
+    return (data || []).filter((n: any) => n.target_roles.includes('all') || n.target_roles.includes(role));
+  },
+  getTimetableForFaculty: async (facultyId: string) => {
+    const assignments = (await supabase.from('subject_assignments').select('*').eq('faculty_id', facultyId)).data || [];
+    const assignmentIds = assignments.map((a: any) => a.id);
+    if (!assignmentIds.length) return [];
+    return (await supabase.from('timetable').select('*').in('subject_assignment_id', assignmentIds)).data || [];
+  },
+  getLeaveRequestsByDepartment: async (deptId: string) => {
+    // Basic implementation that fetches all, you could refine this via joins later
+    return (await supabase.from('leave_requests').select('*')).data || [];
+  },
   generateSQLSchema: () => "-- Schema is in supabase",
-  fetchAllData: async () => {
+  fetchAllData: async (): Promise<DatabaseState> => {
     const [
       users, departments, principals, hods, faculty, students,
       admission_documents, subjects, subject_assignments, timetable,
@@ -342,6 +376,33 @@ export const db = {
   getStudentById: async (id: string) => (await supabase.from('students').select('*').eq('id', id).single()).data || undefined,
   getStudentByUserId: async (userId: string) => (await supabase.from('students').select('*').eq('user_id', userId).single()).data || undefined,
   getStudentsByDepartment: async (deptId: string) => (await supabase.from('students').select('*').eq('department_id', deptId)).data || [],
+  getStudentByRollNumber: async (roll: string) => {
+    const { data } = await supabase.from('students').select('*').ilike('roll_number', roll).single();
+    return data || undefined;
+  },
+  selfRegisterStudent: async (rollNumber: string, email: string, password: string) => {
+    const student = await db.getStudentByRollNumber(rollNumber);
+    if (!student) throw new Error('Student not found');
+    
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: student.name, role: 'student' } }
+    });
+    
+    if (authError) throw authError;
+    if (!authData.user) throw new Error("Auth creation failed");
+    
+    await supabase.from('users').insert({
+      id: authData.user.id, email, role: 'student', full_name: student.name, is_active: true
+    });
+
+    await supabase.from('students').update({
+      user_id: authData.user.id, status: 'ERP Account Active', email
+    }).eq('id', student.id);
+    
+    return true;
+  },
   
   createStudent: async (student: any) => {
     const newStudent = { ...student, id: generateUUID(), enrollment_date: new Date().toISOString() };
@@ -453,5 +514,8 @@ export const db = {
 
 // Export an instance compatible with the previous 'export const db = new Database()' usage.
 // Since we used 'export const db = { ... }' directly, we are already compliant.
+
+
+
 
 

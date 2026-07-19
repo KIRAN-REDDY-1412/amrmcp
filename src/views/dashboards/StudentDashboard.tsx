@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { GraduationCap, Phone, UserCheck, Building, Clock, MapPin, Search, Calendar as CalendarIcon, FileText, CheckCircle2, XCircle } from 'lucide-react';
 import { db } from '../../services/db';

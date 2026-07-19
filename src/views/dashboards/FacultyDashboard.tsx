@@ -88,7 +88,10 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
   const myDeptStudents = dbState.students.filter((s) => s.department_id === myDeptId);
 
   // 3. Timetable
-  const myTimetable = db.getTimetableForFaculty(myFacultyId);
+  const [myTimetable, setMyTimetable] = useState<any[]>([]);
+  useEffect(() => {
+    db.getTimetableForFaculty(myFacultyId).then(setMyTimetable);
+  }, [myFacultyId]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();

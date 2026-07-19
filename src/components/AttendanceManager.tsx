@@ -41,7 +41,7 @@ export const AttendanceManager: React.FC<Props> = ({ isReadOnly = false, canEdit
     setSection('');
   }, [course]);
 
-  const loadStudents = () => {
+  const loadStudents = async () => {
     if (!course || !year || !section || !subjectId || !date || !period) {
       showToast('Please select all required filters.', 'error');
       return;
@@ -56,12 +56,12 @@ export const AttendanceManager: React.FC<Props> = ({ isReadOnly = false, canEdit
     }
 
     // Check if attendance already exists
-    const existing = db.getAttendanceByFilters(date, subjectId, period);
+    const existing = await db.getAttendanceByFilters(date, subjectId, period);
     
     // Check if it's the same class (course/year/section) - for prototype simplicity, we assume subjects are unique to a class
     // Or we just check if existing records have these students
     
-    const fetchedStudents = db.getStudentsByFilters({ course, branch, year, semester, section });
+    const fetchedStudents = await db.getStudentsByFilters({ course, branch, year, semester, section });
     
     if (fetchedStudents.length === 0) {
       showToast('No students found for this selection.', 'error');

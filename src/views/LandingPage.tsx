@@ -130,7 +130,10 @@ export const LandingPage: React.FC = () => {
     navigation.navigate('login', { role: roleId });
   };
 
-  const usersCount = db.getUsers().length;
+  const [usersCount, setUsersCount] = useState(0);
+  useEffect(() => {
+    db.getUsers().then(users => setUsersCount(users.length));
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col justify-between overflow-x-hidden relative bg-slate-50 dark:bg-navy-950 transition-colors duration-300">

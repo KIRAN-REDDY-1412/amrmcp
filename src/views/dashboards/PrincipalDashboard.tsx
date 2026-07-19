@@ -80,7 +80,8 @@ export const PrincipalDashboard: React.FC<DashboardProps> = ({ activeTab, search
     if (!hodName || !hodEmail || !hodPassword || !hodDeptId) return;
 
     // Check email uniqueness
-    const emailExists = db.getUsers().some((u) => u.email.toLowerCase() === hodEmail.toLowerCase());
+    const users = await db.getUsers();
+    const emailExists = users.some((u: any) => u.email.toLowerCase() === hodEmail.toLowerCase());
     if (emailExists) {
       showToast('Email is already registered.', 'error');
       return;

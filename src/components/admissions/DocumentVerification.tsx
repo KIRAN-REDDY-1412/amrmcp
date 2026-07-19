@@ -11,9 +11,10 @@ export const DocumentVerification: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   useEffect(() => {
-    const loadData = () => {
-      setStudents(db.getStudents().filter(s => s.status === 'Documents Uploaded' || s.status === 'Documents Pending'));
-      setDocuments(db.getAdmissionDocuments());
+    const loadData = async () => {
+      const students = await db.getStudents();
+      setStudents(students.filter((s: any) => s.status === 'Documents Uploaded' || s.status === 'Documents Pending'));
+      setDocuments(await db.getAdmissionDocuments());
     };
     
     loadData();

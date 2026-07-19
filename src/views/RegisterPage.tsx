@@ -31,7 +31,7 @@ export const RegisterPage: React.FC = () => {
     setIsSubmitting(true);
     try {
       // 1. Verify student exists by Roll Number
-      const student = db.getStudentByRollNumber(rollNumber);
+      const student = await db.getStudentByRollNumber(rollNumber);
       if (!student) {
         if (activeTab === 'new_student') {
           throw new Error('Roll number not found. Please ensure the Admission Cell has added your details.');

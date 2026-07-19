@@ -106,7 +106,8 @@ export const HODDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilter
     if (!facName || !facEmail || !facPassword) return;
 
     // Check unique email
-    const emailExists = db.getUsers().some((u) => u.email.toLowerCase() === facEmail.toLowerCase());
+    const users = await db.getUsers();
+    const emailExists = users.some((u: any) => u.email.toLowerCase() === facEmail.toLowerCase());
     if (emailExists) {
       showToast('Email is already registered.', 'error');
       return;
@@ -366,8 +367,11 @@ export const HODDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilter
     return sub && sub.department_id === myDeptId;
   });
 
-  const myLeaveRequests = db.getLeaveRequestsByDepartment(myDeptId);
-  const pendingLeaves = myLeaveRequests.filter((lr) => lr.status === 'Pending');
+  const [myLeaveRequests, setMyLeaveRequests] = useState<any[]>([]);
+  useEffect(() => {
+    db.getLeaveRequestsByDepartment(myDeptId).then(setMyLeaveRequests);
+  }, [myDeptId]);
+  const pendingLeaves = myLeaveRequests.filter((lr: any) => lr.status === 'Pending');
 
   return (
     <div className="space-y-6">
@@ -626,7 +630,7 @@ export const HODDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilter
             </div>
           ) : (
             <div className="space-y-4">
-              {pendingLeaves.map((lr) => (
+              {pendingLeaves.map((lr: any) => (
                 <div key={lr.id} className="p-5 bg-slate-50 dark:bg-navy-950 border border-slate-100 dark:border-navy-800 rounded-2xl flex flex-col md:flex-row justify-between md:items-center gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">

@@ -99,11 +99,26 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   };
 
   // SQL Copy to Clipboard
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const handleCopySQL = () => {
     navigator.clipboard.writeText(db.generateSQLSchema());
     setCopiedSQL(true);
     showToast('Supabase SQL Schema copied to clipboard!', 'success');
     setTimeout(() => setCopiedSQL(false), 2000);
+  };
+
+  const handleSyncSupabase = async () => {
+    setIsSyncing(true);
+    try {
+      await db.syncWithSupabase();
+      showToast('Successfully synced with Supabase!', 'success');
+      triggerStateRefresh();
+    } catch (err) {
+      showToast('Failed to sync with Supabase.', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // Backup JSON Export
@@ -1444,6 +1459,13 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                 >
                   {copiedSQL ? <Check size={14} /> : <Copy size={14} />}
                   <span>Copy SQL Migration Script</span>
+                </button>
+                <button
+                  onClick={handleSyncSupabase}
+                  disabled={isSyncing}
+                  className="flex-shrink-0 flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl text-xs font-bold transition-all"
+                >
+                  {isSyncing ? 'Syncing...' : 'Sync Database'}
                 </button>
                 <button
                   onClick={handleClearDatabase}

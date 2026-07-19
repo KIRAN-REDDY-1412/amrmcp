@@ -357,8 +357,16 @@ export class Database {
     };
 
     const mergeArrays = (local: any[], remote: any[] | null) => {
-      if (!remote) return local; // keep local only if fetch completely failed (e.g., no internet)
-      return remote; // remote is the absolute source of truth
+      if (!remote) return local;
+      
+      return remote.map(remoteItem => {
+        const localItem = local.find(l => l.id === remoteItem.id);
+        if (localItem) {
+          // Merge to preserve local-only fields that might be missing in remote schema
+          return { ...localItem, ...remoteItem };
+        }
+        return remoteItem;
+      });
     };
 
     try {
@@ -400,7 +408,15 @@ export class Database {
         principals: mergeArrays(this.state.principals, principals),
         hods: mergeArrays(this.state.hods, hods),
         faculty: mergeArrays(this.state.faculty, faculty),
-        students: mergeArrays(this.state.students, students),
+        students: mergeArrays(this.state.students, students).map((s: any) => {
+          if (!s.status) {
+            if (s.user_id) s.status = 'ERP Account Active';
+            else if (s.roll_number) s.status = 'Roll Number Assigned';
+            else s.status = 'Draft';
+          }
+          if (!s.course) s.course = 'B.PHARM'; // Default if created via Supabase directly
+          return s;
+        }),
         admission_documents: mergeArrays(this.state.admission_documents, []), // or fetch them if added to fetchTable
         subjects: mergeArrays(this.state.subjects, subjects),
         subject_assignments: mergeArrays(this.state.subject_assignments, subject_assignments),

@@ -81,6 +81,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [userQual, setUserQual] = useState('');
   const [userDesg, setUserDesg] = useState('');
   const [userSpec, setUserSpec] = useState('');
+  const [userBio, setUserBio] = useState('');
 
   const [studRoll, setStudRoll] = useState('');
   const [studCourse, setStudCourse] = useState('B.PHARM');
@@ -507,6 +508,99 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
       setUserDesg('');
     } catch (err: any) {
       showToast(err.message || 'Failed to register user.', 'error');
+    }
+  };
+
+  const handleEditUserOpen = (u: User) => {
+    setSelectedUserId(u.id);
+    setUserName(u.full_name);
+    setUserEmail(u.email);
+    setUserRole(u.role as any);
+    
+    // Load profile specific fields
+    setUserPhone('');
+    setUserQual('');
+    setUserDesg('');
+    setUserBio('');
+    setUserDeptId('');
+
+    if (u.role === 'principal') {
+      const p = dbState.principals.find((pr) => pr.user_id === u.id);
+      if (p) {
+        setUserPhone(p.phone || '');
+        setUserQual(p.qualifications || '');
+        setUserBio(p.bio || '');
+      }
+    } else if (u.role === 'hod') {
+      const h = dbState.hods.find((hod) => hod.user_id === u.id);
+      if (h) {
+        setUserPhone(h.phone || '');
+        setUserQual(h.qualifications || '');
+        setUserDeptId(h.department_id || '');
+      }
+    } else if (u.role === 'faculty') {
+      const f = dbState.faculty.find((fac) => fac.user_id === u.id);
+      if (f) {
+        setUserPhone(f.phone || '');
+        setUserQual(f.qualifications || '');
+        setUserDeptId(f.department_id || '');
+        setUserDesg(f.designation || '');
+      }
+    }
+    
+    setActiveModal('edit_user');
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserId) return;
+
+    try {
+      // Update Base User
+      const updatedUser = await db.updateUser(selectedUserId, {
+        full_name: userName,
+      });
+
+      // Email change needs special handler
+      const u = dbState.users.find((user) => user.id === selectedUserId);
+      if (u && u.email.toLowerCase() !== userEmail.toLowerCase()) {
+        await db.updateUserEmail(selectedUserId, userEmail.toLowerCase());
+      }
+
+      // Update Profile Details
+      if (userRole === 'principal') {
+        await db.updatePrincipalProfile(selectedUserId, {
+          phone: userPhone,
+          qualifications: userQual,
+          bio: userBio,
+        });
+      } else if (userRole === 'hod') {
+        await db.updateHODProfile(selectedUserId, {
+          phone: userPhone,
+          qualifications: userQual,
+          department_id: userDeptId,
+        });
+      } else if (userRole === 'faculty') {
+        await db.updateFacultyProfile(selectedUserId, {
+          phone: userPhone,
+          qualifications: userQual,
+          department_id: userDeptId,
+          designation: userDesg,
+        });
+      }
+
+      await db.logAction(
+        currentUser!.id,
+        currentUser!.email,
+        currentUser!.role,
+        'Edit User',
+        `Updated user details for: ${userName}`
+      );
+      showToast(`User details updated successfully.`, 'success');
+      setActiveModal(null);
+      triggerStateRefresh();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update user.', 'error');
     }
   };
 
@@ -1205,6 +1299,13 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                         </td>
                         <td className="py-3.5 pr-2 text-right space-x-2">
                           <button
+                            onClick={() => handleEditUserOpen(u)}
+                            className="p-1.5 text-navy-400 hover:text-primary-500 hover:bg-slate-100 dark:hover:bg-navy-800 rounded-lg transition-colors"
+                            title="Edit User"
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                          <button
                             onClick={() => handleToggleUserActive(u)}
                             className={`p-1.5 rounded-lg transition-colors ${
                               u.is_active ? 'text-green-500 hover:bg-green-50 dark:hover:bg-green-950/20' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20'
@@ -1388,6 +1489,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                 {activeModal === 'reset_password' && 'Perform Password Override'}
                 {activeModal === 'create_student' && 'Register Student Profile'}
                 {activeModal === 'edit_student' && 'Modify Student Record'}
+                {activeModal === 'edit_user' && 'Modify User Details'}
                 {activeModal === 'view_users' && (viewRole === 'principal' ? 'Principals' : viewRole === 'hod' ? 'Head of Departments' : 'Faculty')}
               </h4>
               <button
@@ -1479,6 +1581,115 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                 <button
                   type="submit"
                   className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm"
+                >
+                  Save Changes
+                </button>
+              </form>
+            )}
+
+            {/* Edit User */}
+            {activeModal === 'edit_user' && (
+              <form onSubmit={handleUpdateUser} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Email (Login ID)</label>
+                  <input
+                    type="email"
+                    required
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Role</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={userRole.toUpperCase()}
+                    className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-100 dark:bg-navy-900 text-sm text-navy-400 font-bold cursor-not-allowed"
+                  />
+                </div>
+
+                {(userRole === 'principal' || userRole === 'hod' || userRole === 'faculty') && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Phone</label>
+                        <input
+                          type="tel"
+                          value={userPhone}
+                          onChange={(e) => setUserPhone(e.target.value)}
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Qualifications</label>
+                        <input
+                          type="text"
+                          value={userQual}
+                          onChange={(e) => setUserQual(e.target.value)}
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {(userRole === 'hod' || userRole === 'faculty') && (
+                  <div className="mt-4">
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Department</label>
+                    <select
+                      required
+                      value={userDeptId}
+                      onChange={(e) => setUserDeptId(e.target.value)}
+                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                    >
+                      <option value="">-- Select Department --</option>
+                      {dbState.departments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {userRole === 'faculty' && (
+                  <div className="mt-4">
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Designation</label>
+                    <input
+                      type="text"
+                      required
+                      value={userDesg}
+                      onChange={(e) => setUserDesg(e.target.value)}
+                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {userRole === 'principal' && (
+                  <div className="mt-4">
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Bio</label>
+                    <textarea
+                      value={userBio}
+                      onChange={(e) => setUserBio(e.target.value)}
+                      rows={3}
+                      className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm mt-4"
                 >
                   Save Changes
                 </button>

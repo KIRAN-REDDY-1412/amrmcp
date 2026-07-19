@@ -68,32 +68,15 @@ export const AdmissionForm: React.FC<AdmissionFormProps> = ({ onComplete }) => {
     setIsSubmitting(true);
     try {
       // 1. Insert Student Record
+      const defaultDept = '00000000-0000-0000-0000-000000000000'; // Need a valid UUID or look it up
       const { data: student, error: studentError } = await supabase
         .from('students')
         .insert({
-          status: 'Documents Uploaded',
-          course,
-          admission_quota: admissionQuota,
           name,
-          gender,
-          dob: dob || null,
+          roll_number: `TEMP-${Date.now()}`, // Temporary roll number since it's required and unique
+          department_id: defaultDept,
           phone,
-          email,
-          aadhaar_number: aadhaar,
-          nationality,
-          religion,
-          caste,
-          sub_caste: subCaste,
-          mole_1: mole1,
-          mole_2: mole2,
-          address,
-          father_name: fatherName,
-          mother_name: motherName,
-          parent_phone: parentPhone,
-          parent_email: parentEmail,
-          father_occupation: fatherOccupation,
-          father_aadhaar: fatherAadhaar,
-          mother_aadhaar: motherAadhaar
+          guardian_name: fatherName || motherName || 'Unknown',
         })
         .select('id')
         .single();

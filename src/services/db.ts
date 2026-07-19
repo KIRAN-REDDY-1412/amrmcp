@@ -936,14 +936,17 @@ export class Database {
     });
     if (userError) throw userError;
 
-    // 3. Link to student and change status
-    const { error: updateError } = await supabase.from('students').update({
-      user_id: authData.user.id,
-      status: 'ERP Account Active',
-      email: tempEmail // Also set their contact email to the college one if needed
-    }).eq('id', student.id);
-
-    if (updateError) throw updateError;
+    // 3. Link to student and change status (Only in local state since DB lacks these columns)
+    // Removed supabase update since user_id, status, email are not in the Supabase students table.
+    
+    // Instead, just update local state directly so it persists in localStorage
+    const localStudent = this.state.students.find(s => s.id === student.id);
+    if (localStudent) {
+      localStudent.user_id = authData.user.id;
+      localStudent.status = 'ERP Account Active';
+      localStudent.email = tempEmail;
+      this.save();
+    }
     
     await this.syncWithSupabase();
     return true;
@@ -989,31 +992,19 @@ export class Database {
     
     if (userError) throw userError;
 
-    // 3. Link to student and change status
-    const { error: updateError } = await supabase.from('students').update({
-      user_id: newUserId,
-      status: 'ERP Account Active',
-      email: email.toLowerCase()
-    }).eq('id', student.id);
-
-    if (updateError) throw updateError;
+    // 3. Link to student and change status (Local State Only)
+    // Removed supabase update since user_id, status, email are not in the Supabase students table.
     
-    // Update local state
-    if (!this.state.users.find(u => u.id === newUserId)) {
-      this.state.users.push({
-        id: newUserId,
-        email: email.toLowerCase(),
-        role: 'student',
-        full_name: student.name,
-        is_active: true,
-        created_at: new Date().toISOString()
-      });
+    // Instead, update local state
+    const localStudent = this.state.students.find(s => s.id === student.id);
+    if (localStudent) {
+      localStudent.user_id = newUserId || '';
+      localStudent.status = 'ERP Account Active';
+      localStudent.email = email.toLowerCase();
+      this.save();
     }
-    student.user_id = newUserId;
-    student.status = 'ERP Account Active';
-    student.email = email.toLowerCase();
-    this.save();
     
+    await this.syncWithSupabase();
     return true;
   }
 

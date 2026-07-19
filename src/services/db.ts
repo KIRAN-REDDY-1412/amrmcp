@@ -836,9 +836,26 @@ export class Database {
       id: generateUUID(),
       enrollment_date: new Date().toISOString(),
     };
-    const { error } = await supabase.from('students').insert([newStudent]);
-    if (error) {
-      throw new Error(`Failed to create student in database: ${error.message}`);
+
+    // Ensure we only insert columns that exist in the Supabase schema
+    const defaultDept = this.state.departments.length > 0 ? this.state.departments[0].id : null;
+    const dbStudent = {
+      id: newStudent.id,
+      name: newStudent.name,
+      roll_number: newStudent.roll_number,
+      department_id: newStudent.department_id || defaultDept,
+      phone: newStudent.phone || '',
+      guardian_name: newStudent.guardian_name || '',
+      enrollment_date: newStudent.enrollment_date
+    };
+
+    if (dbStudent.department_id) {
+        const { error } = await supabase.from('students').insert([dbStudent]);
+        if (error) {
+          throw new Error(`Failed to create student in database: ${error.message}`);
+        }
+    } else {
+        console.warn("Skipping Supabase insert for student because no department_id is available.");
     }
 
     this.state.students.push(newStudent);
@@ -847,8 +864,18 @@ export class Database {
   }
 
   public async updateStudent(id: string, updates: Partial<Omit<Student, 'id' | 'enrollment_date'>>): Promise<Student | null> {
-    const { error } = await supabase.from('students').update(updates).eq('id', id);
-    if (error) throw error;
+    const validDbKeys = ['name', 'roll_number', 'department_id', 'phone', 'guardian_name'];
+    const dbUpdates: any = {};
+    for (const key of validDbKeys) {
+      if (key in updates) {
+        dbUpdates[key] = (updates as any)[key];
+      }
+    }
+    
+    if (Object.keys(dbUpdates).length > 0) {
+      const { error } = await supabase.from('students').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+    }
 
     const index = this.state.students.findIndex((s) => s.id === id);
     if (index === -1) return null;

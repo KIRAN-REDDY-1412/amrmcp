@@ -71,8 +71,9 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [userPassword, setUserPassword] = useState('');
-  const [userRole, setUserRole] = useState<'admin' | 'principal' | 'hod' | 'faculty' | 'library' | 'exam_cell' | 'admission_cell' | 'student'>('faculty');
+  const [userRole, setUserRole] = useState<'admin' | 'principal' | 'hod' | 'faculty' | 'library' | 'exam_cell' | 'admission_cell' | 'student' | 'existing_student'>('faculty');
   const [isAssignExisting, setIsAssignExisting] = useState(false);
+  const [isStudentModal, setIsStudentModal] = useState(false);
   const [assignUserId, setAssignUserId] = useState('');
   const [existingUserId, setExistingUserId] = useState('');
   const [userDeptId, setUserDeptId] = useState('');
@@ -227,7 +228,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (userRole === 'student') {
+    if (userRole === 'student' || userRole === 'existing_student') {
       if (!userName || !userPassword) {
         showToast('Please enter both roll number and password.', 'warning');
         return;
@@ -934,6 +935,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                   <button
                     onClick={() => {
                       setIsAssignExisting(false);
+                      setIsStudentModal(true);
                       setUserRole('student');
                       setActiveModal('create_user');
                     }}
@@ -945,6 +947,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                 <button
                   onClick={() => {
                     setIsAssignExisting(false);
+                    setIsStudentModal(false);
                     let defaultRole = 'faculty';
                     if (activeTab === 'administrators') defaultRole = 'admin';
                     if (activeTab === 'principals') defaultRole = 'principal';
@@ -1223,7 +1226,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
               <h4 className="font-extrabold text-navy-950 dark:text-white text-base">
                 {activeModal === 'create_dept' && 'Add Department'}
                 {activeModal === 'edit_dept' && 'Modify Department'}
-                {activeModal === 'create_user' && 'Register Staff User'}
+                {activeModal === 'create_user' && (isStudentModal ? 'Register Student User' : 'Register Staff User')}
                 {activeModal === 'reset_password' && 'Perform Password Override'}
                 {activeModal === 'create_student' && 'Register Student Profile'}
                 {activeModal === 'edit_student' && 'Modify Student Record'}
@@ -1358,18 +1361,26 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                       onChange={(e) => setUserRole(e.target.value as any)}
                       className="mt-1.5 block w-full rounded-xl border border-slate-200 dark:border-navy-800 bg-white dark:bg-navy-950 px-4 py-2.5 text-navy-900 dark:text-white focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                     >
-                      {(activeTab === 'users' || activeTab === 'administrators' || activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty') && (
+                      {isStudentModal ? (
                         <>
-                          <option value="admin">Administrator</option>
-                          <option value="principal">Principal</option>
-                          <option value="hod">HOD</option>
-                          <option value="faculty">Faculty</option>
+                          <option value="student">Student</option>
+                          <option value="existing_student">Existing Student</option>
+                        </>
+                      ) : (
+                        <>
+                          {(activeTab === 'users' || activeTab === 'administrators' || activeTab === 'principals' || activeTab === 'hods' || activeTab === 'faculty') && (
+                            <>
+                              <option value="admin">Administrator</option>
+                              <option value="principal">Principal</option>
+                              <option value="hod">HOD</option>
+                              <option value="faculty">Faculty</option>
+                            </>
+                          )}
+                          {(activeTab === 'users' || activeTab === 'library') && <option value="library">Library</option>}
+                          {(activeTab === 'users' || activeTab === 'exam_cell') && <option value="exam_cell">Exam Cell</option>}
+                          {(activeTab === 'users' || activeTab === 'admission_cell') && <option value="admission_cell">Admission Cell</option>}
                         </>
                       )}
-                      {(activeTab === 'users' || activeTab === 'library') && <option value="library">Library</option>}
-                      {(activeTab === 'users' || activeTab === 'exam_cell') && <option value="exam_cell">Exam Cell</option>}
-                      {(activeTab === 'users' || activeTab === 'admission_cell') && <option value="admission_cell">Admission Cell</option>}
-                      {activeTab === 'users' && <option value="student">Student</option>}
                     </select>
                   </div>
                   {/* Department Field (Conditional for HOD & Faculty) */}
@@ -1420,7 +1431,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                       Assign Role to Staff
                     </button>
                   </>
-                ) : userRole === 'student' ? (
+                ) : (userRole === 'student' || userRole === 'existing_student') ? (
                   <>
                     <div className="grid grid-cols-2 gap-3 mt-4">
                       <div>

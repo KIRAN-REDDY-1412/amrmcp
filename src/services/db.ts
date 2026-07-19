@@ -408,30 +408,10 @@ export const db = {
   createStudent: async (student: any) => {
     const newStudent = { ...student, id: generateUUID(), enrollment_date: new Date().toISOString() };
     const { data, error } = await supabase.from('students').insert([newStudent]).select().single();
-    if (error) {
-      if (error.message?.includes('schema cache')) {
-        const { admission_quota, guardian_name, ...rest } = newStudent;
-        const { data: retryData, error: retryError } = await supabase.from('students').insert([rest]).select().single();
-        if (retryError) throw retryError;
-        return retryData;
-      }
-      throw error;
-    }
+    if (error) throw error;
     return data;
   },
-  updateStudent: async (id: string, updates: any) => {
-    const { data, error } = await supabase.from('students').update(updates).eq('id', id).select().single();
-    if (error) {
-      if (error.message?.includes('schema cache')) {
-        const { admission_quota, guardian_name, ...rest } = updates;
-        const { data: retryData, error: retryError } = await supabase.from('students').update(rest).eq('id', id).select().single();
-        if (retryError) throw retryError;
-        return retryData;
-      }
-      throw error;
-    }
-    return data;
-  },
+  updateStudent: async (id: string, updates: any) => (await supabase.from('students').update(updates).eq('id', id).select().single()).data,
   deleteStudent: async (id: string) => { await supabase.from('students').delete().eq('id', id); return true; },
   deleteStudents: async (ids: string[]) => { if (ids.length) await supabase.from('students').delete().in('id', ids); return true; },
 

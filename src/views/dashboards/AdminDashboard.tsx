@@ -354,8 +354,8 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     }
 
     if (userRole === 'existing_student') {
-      if (!userName || !userPassword || !studRoll || !studCourse) {
-        showToast('Please fill all required fields.', 'warning');
+      if (!userPassword || !studRoll) {
+        showToast('Please fill all required fields (Roll Number and Password).', 'warning');
         return;
       }
       
@@ -364,6 +364,9 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
         showToast('A student with this roll number already exists.', 'error');
         return;
       }
+      
+      const finalUserName = userName || 'Pending Details';
+      const finalCourse = studCourse || 'Pending';
 
       const generatedEmail = `${studRoll.toLowerCase()}@student.amreddy.edu`;
 
@@ -372,14 +375,14 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
           email: generatedEmail,
           password: userPassword,
           role: 'student',
-          full_name: userName,
+          full_name: finalUserName,
           is_active: true,
         });
 
         await db.createStudent({
-          name: userName,
+          name: finalUserName,
           roll_number: studRoll,
-          course: studCourse,
+          course: finalCourse,
           user_id: newUser.id,
           email: generatedEmail,
           status: 'ERP Account Active',
@@ -1622,34 +1625,12 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                 ) : userRole === 'existing_student' ? (
                   <>
                     <div className="mt-4">
-                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Full Name</label>
-                      <input
-                        type="text"
-                        required
-                        value={userName}
-                        onChange={(e) => setUserName(e.target.value)}
-                        placeholder="John Doe"
-                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                      />
-                    </div>
-                    <div className="mt-4">
                       <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">User ID</label>
                       <p className="text-xs text-navy-500 mb-2 mt-1">
                         The Roll Number will be used as the Login ID.
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-3 mt-4">
-                      <div>
-                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Password</label>
-                        <input
-                          type="text" // using text to mimic original behavior
-                          required
-                          value={userPassword}
-                          onChange={(e) => setUserPassword(e.target.value)}
-                          placeholder="e.g. Student@123"
-                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                        />
-                      </div>
                       <div>
                         <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Roll Number</label>
                         <input
@@ -1661,19 +1642,17 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                           className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
                         />
                       </div>
-                    </div>
-                    <div className="mt-4">
-                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Course</label>
-                      <select
-                        required
-                        value={studCourse}
-                        onChange={(e) => setStudCourse(e.target.value)}
-                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                      >
-                        <option value="B.PHARM">B.Pharm</option>
-                        <option value="M.PHARM">M.Pharm</option>
-                        <option value="PHARM.D">Pharm.D</option>
-                      </select>
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Password</label>
+                        <input
+                          type="text"
+                          required
+                          value={userPassword}
+                          onChange={(e) => setUserPassword(e.target.value)}
+                          placeholder="e.g. Student@123"
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
                     </div>
                     <button
                       type="submit"

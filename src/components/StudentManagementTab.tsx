@@ -35,6 +35,8 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
   const [studPhone, setStudPhone] = useState('');
   const [studEmail, setStudEmail] = useState('');
   const [studGuardian, setStudGuardian] = useState('');
+  const [studGender, setStudGender] = useState<'Male' | 'Female' | 'Other'>('Male');
+  const [studParentPhone, setStudParentPhone] = useState('');
 
   // Form Fields - Bulk Promote
   const [promoteCourse, setPromoteCourse] = useState('');
@@ -137,6 +139,8 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
     setStudEmail(studentUser?.email || '');
     
     setStudGuardian(s.guardian_name || '');
+    setStudGender(s.gender || 'Male');
+    setStudParentPhone(s.parent_phone || '');
     setActiveModal('edit_student');
   };
 
@@ -152,6 +156,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
       await db.updateStudent(selectedStudentId, {
         name: studName,
         dob: studDob,
+        gender: studGender,
         course: studCourse,
         branch: studCourse === 'M.PHARM' ? studBranch : undefined,
         year: studYear,
@@ -160,6 +165,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
         academic_year: studAcademicYear,
         batch: studBatch,
         phone: studPhone,
+        parent_phone: studParentPhone,
         guardian_name: studGuardian,
       });
 
@@ -631,6 +637,68 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                       </select>
                     </div>
                   )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Gender</label>
+                    <select value={studGender} onChange={(e) => setStudGender(e.target.value as any)} className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white">
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Year</label>
+                    <select value={studYear} onChange={(e) => setStudYear(e.target.value)} className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white">
+                      <option value="">-- Select --</option>
+                      <option value="I Year">I Year</option>
+                      <option value="II Year">II Year</option>
+                      <option value="III Year">III Year</option>
+                      <option value="IV Year">IV Year</option>
+                      <option value="V Year">V Year</option>
+                      <option value="VI Year">VI Year</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Semester</label>
+                    <select value={studSemester} onChange={(e) => setStudSemester(e.target.value)} className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white">
+                      <option value="">-- Select --</option>
+                      <option value="I Semester">I Semester</option>
+                      <option value="II Semester">II Semester</option>
+                      <option value="III Semester">III Semester</option>
+                      <option value="IV Semester">IV Semester</option>
+                      <option value="V Semester">V Semester</option>
+                      <option value="VI Semester">VI Semester</option>
+                      <option value="VII Semester">VII Semester</option>
+                      <option value="VIII Semester">VIII Semester</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Section</label>
+                    <input type="text" value={studSection} onChange={(e) => setStudSection(e.target.value)} placeholder="e.g. A" className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Mail ID (Personal)</label>
+                    <input type="email" value={studEmail} onChange={(e) => setStudEmail(e.target.value)} placeholder="student@example.com" className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Mobile Number</label>
+                    <input type="tel" value={studPhone} onChange={(e) => setStudPhone(e.target.value)} placeholder="e.g. 9876543210" className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Parent Mobile Number</label>
+                    <input type="tel" value={studParentPhone} onChange={(e) => setStudParentPhone(e.target.value)} placeholder="e.g. 9876543210" className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white" />
+                  </div>
                 </div>
                 <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-navy-800 mt-6">
                   <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 text-sm font-bold text-navy-600 dark:text-navy-300 hover:bg-slate-100 dark:hover:bg-navy-800 rounded-xl transition-colors">

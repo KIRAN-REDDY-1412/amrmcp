@@ -316,7 +316,8 @@ export const db = {
         throw authError;
       }
     }
-    const newUser = { ...user, id: newUserId, created_at: new Date().toISOString() };
+    const { password: _password, ...userWithoutPassword } = user;
+    const newUser = { ...userWithoutPassword, id: newUserId, created_at: new Date().toISOString() };
     const { data, error } = await supabase.from('users').upsert([newUser]).select().single();
     if (error) throw error;
     return data;

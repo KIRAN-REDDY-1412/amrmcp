@@ -3,7 +3,7 @@ import { db } from '../services/db';
 import type { Student, Department } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './Toast';
-import { Plus, Edit2, Trash2, GraduationCap, X, Upload, Download, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, GraduationCap, X, Upload, Download, Loader2, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface StudentManagementTabProps {
@@ -46,6 +46,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadDeptId, setUploadDeptId] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     setDbState(db.getRawState());
@@ -53,6 +54,19 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
 
   const triggerStateRefresh = () => {
     setDbState({ ...db.getRawState() });
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await db.syncWithSupabase();
+      showToast('Successfully synced with Supabase!', 'success');
+      triggerStateRefresh();
+    } catch (err: any) {
+      showToast(`Failed to sync: ${err.message}`, 'error');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   if (!currentUser) return null;
@@ -424,6 +438,13 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             <p className="text-xs text-navy-400">View and manage enrolled student directories</p>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} /> Sync
+            </button>
             <button
               onClick={handleDownloadTemplate}
               className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-navy-800 dark:hover:bg-navy-700 text-navy-600 dark:text-navy-300 rounded-xl text-sm font-bold transition-colors"

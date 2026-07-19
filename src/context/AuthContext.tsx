@@ -165,6 +165,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             user = remoteUser as User;
             // Ensure they get pushed to local state to fix the gap
             db.forceAddUserToLocalState(user);
+          } else if (authData.user.user_metadata && authData.user.user_metadata.role) {
+            // AUTO-RECOVERY: If they have an auth account but no public.users record (e.g. failed due to RLS during registration)
+            // They are authenticated now, so they can insert their own record.
+            console.warn('User record missing in public.users, auto-recovering from auth metadata...');
+            const newUserData: User = {
+              id: authData.user.id,
+              email: authData.user.email || '',
+              role: authData.user.user_metadata.role,
+              full_name: authData.user.user_metadata.full_name || 'Student User',
+              is_active: true,
+              created_at: new Date().toISOString()
+            };
+            
+            await supabase.from('users').insert([newUserData]);
+            user = newUserData;
+            db.forceAddUserToLocalState(user);
           }
         }
 

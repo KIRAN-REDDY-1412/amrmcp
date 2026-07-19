@@ -587,6 +587,14 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
           department_id: userDeptId,
           designation: userDesg,
         });
+      } else if (userRole === 'student') {
+        const student = dbState.students.find(s => s.user_id === selectedUserId);
+        if (student) {
+          await db.updateStudent(student.id, {
+            name: userName,
+            email: userEmail.toLowerCase(),
+          });
+        }
       }
 
       await db.logAction(
@@ -1236,10 +1244,10 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                         checked={paginateList(filteredUsers).length > 0 && paginateList(filteredUsers).every(u => selectedUserIds.includes(u.id))}
                       />
                     </th>
-                    <th className="pb-3 pl-2">Name</th>
+                    <th className="pb-3 pl-2">{userDirectoryFilter === 'students' ? 'Roll Number' : 'Name'}</th>
                     <th className="pb-3">Email</th>
                     <th className="pb-3">Role</th>
-                    <th className="pb-3">Department</th>
+                    {userDirectoryFilter !== 'students' && <th className="pb-3">Department</th>}
                     <th className="pb-3">Status</th>
                     <th className="pb-3 pr-2 text-right">Actions</th>
                   </tr>
@@ -1248,13 +1256,19 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                   {paginateList(filteredUsers).map((u) => {
                     // Fetch department name if applicable
                     let deptNameVal = 'N/A';
+                    let rollNumberVal = u.full_name;
                     if (u.role === 'hod') {
                       const h = dbState.hods.find((hod) => hod.user_id === u.id);
                       if (h) deptNameVal = getDeptName(h.department_id);
                     } else if (u.role === 'faculty') {
                       const f = dbState.faculty.find((fac) => fac.user_id === u.id);
                       if (f) deptNameVal = getDeptName(f.department_id);
+                    } else if (u.role === 'student') {
+                      const s = dbState.students.find((std) => std.user_id === u.id);
+                      if (s && s.roll_number) rollNumberVal = s.roll_number;
                     }
+
+                    const firstColumnVal = userDirectoryFilter === 'students' ? rollNumberVal : u.full_name;
 
                     return (
                       <tr key={u.id} className="text-navy-900 dark:text-navy-200 hover:bg-slate-50/50 dark:hover:bg-navy-900/30">
@@ -1272,7 +1286,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                             }}
                           />
                         </td>
-                        <td className="py-3.5 pl-2 font-bold">{u.full_name}</td>
+                        <td className="py-3.5 pl-2 font-bold">{firstColumnVal}</td>
                         <td className="py-3.5 text-xs font-mono">{u.email}</td>
                         <td className="py-3.5">
                           <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
@@ -1287,7 +1301,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                             {u.role}
                           </span>
                         </td>
-                        <td className="py-3.5 text-xs text-navy-500">{deptNameVal}</td>
+                        {userDirectoryFilter !== 'students' && <td className="py-3.5 text-xs text-navy-500">{deptNameVal}</td>}
                         <td className="py-3.5">
                           <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
                             u.is_active

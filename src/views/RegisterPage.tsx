@@ -48,7 +48,8 @@ export const RegisterPage: React.FC = () => {
       }
 
       // 3. Register the student (Create auth user and link)
-      await db.selfRegisterStudent(rollNumber, email, password);
+      const generatedEmail = `${rollNumber.toLowerCase()}@student.amreddy.edu`;
+      await db.selfRegisterStudent(rollNumber, generatedEmail, password);
 
       showToast('Registration successful! You can now log in.', 'success');
       navigation.navigate('login', { role: 'student' });
@@ -161,19 +162,11 @@ export const RegisterPage: React.FC = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider mb-1">
-                    Email Address *
+                    User ID (Roll Number)
                   </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 text-navy-400" size={16} />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
-                      placeholder="student@amreddy.edu"
-                    />
-                  </div>
+                  <p className="text-xs text-navy-500 mb-2">
+                    Your Roll Number will be used as your Login ID.
+                  </p>
                 </div>
 
                 <div>

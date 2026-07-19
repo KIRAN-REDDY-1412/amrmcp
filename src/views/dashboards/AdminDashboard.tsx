@@ -354,7 +354,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     }
 
     if (userRole === 'existing_student') {
-      if (!userName || !userEmail || !userPassword || !studRoll || !studCourse) {
+      if (!userName || !userPassword || !studRoll || !studCourse) {
         showToast('Please fill all required fields.', 'warning');
         return;
       }
@@ -365,9 +365,11 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
         return;
       }
 
+      const generatedEmail = `${studRoll.toLowerCase()}@student.amreddy.edu`;
+
       try {
         const newUser = await db.createUser({
-          email: userEmail.toLowerCase(),
+          email: generatedEmail,
           password: userPassword,
           role: 'student',
           full_name: userName,
@@ -379,7 +381,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
           roll_number: studRoll,
           course: studCourse,
           user_id: newUser.id,
-          email: userEmail.toLowerCase(),
+          email: generatedEmail,
           status: 'ERP Account Active',
           admission_quota: 'Convenor',
           gender: 'Male', // default for admin manual creation unless added field
@@ -1631,15 +1633,10 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                       />
                     </div>
                     <div className="mt-4">
-                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Email Address</label>
-                      <input
-                        type="email"
-                        required
-                        value={userEmail}
-                        onChange={(e) => setUserEmail(e.target.value)}
-                        placeholder="student@amreddy.edu"
-                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
-                      />
+                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">User ID</label>
+                      <p className="text-xs text-navy-500 mb-2 mt-1">
+                        The Roll Number will be used as the Login ID.
+                      </p>
                     </div>
                     <div className="grid grid-cols-2 gap-3 mt-4">
                       <div>

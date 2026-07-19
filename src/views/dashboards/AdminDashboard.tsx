@@ -82,6 +82,9 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [userDesg, setUserDesg] = useState('');
   const [userSpec, setUserSpec] = useState('');
 
+  const [studRoll, setStudRoll] = useState('');
+  const [studCourse, setStudCourse] = useState('B.PHARM');
+
   // Form Fields - Password Reset
   const [newPasswordVal, setNewPasswordVal] = useState('');
 
@@ -228,7 +231,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (userRole === 'student' || userRole === 'existing_student') {
+    if (userRole === 'student') {
       if (!userName || !userPassword) {
         showToast('Please enter both roll number and password.', 'warning');
         return;
@@ -257,6 +260,56 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
         triggerStateRefresh();
       } catch (err: any) {
         showToast(err.message || 'Failed to register student to ERP.', 'error');
+      }
+      return;
+    }
+
+    if (userRole === 'existing_student') {
+      if (!userName || !userEmail || !userPassword || !studRoll || !studCourse) {
+        showToast('Please fill all required fields.', 'warning');
+        return;
+      }
+      
+      const studentExists = dbState.students.some(s => s.roll_number?.toLowerCase() === studRoll.toLowerCase());
+      if (studentExists) {
+        showToast('A student with this roll number already exists.', 'error');
+        return;
+      }
+
+      try {
+        const newUser = await db.createUser({
+          email: userEmail.toLowerCase(),
+          password: userPassword,
+          role: 'student',
+          full_name: userName,
+          is_active: true,
+        });
+
+        await db.createStudent({
+          name: userName,
+          roll_number: studRoll,
+          course: studCourse,
+          user_id: newUser.id,
+          email: userEmail.toLowerCase(),
+          status: 'ERP Account Active',
+          admission_quota: 'Convenor',
+          gender: 'Male', // default for admin manual creation unless added field
+          phone: '',
+          guardian_name: ''
+        });
+
+        await db.logAction(
+          currentUser!.id,
+          currentUser!.email,
+          currentUser!.role,
+          'Create Existing Student',
+          `Directly created existing student account: ${userName} (${studRoll})`
+        );
+        showToast(`Account created for ${userName}`, 'success');
+        setActiveModal(null);
+        triggerStateRefresh();
+      } catch (err: any) {
+        showToast(err.message || 'Failed to create existing student account.', 'error');
       }
       return;
     }
@@ -1431,7 +1484,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                       Assign Role to Staff
                     </button>
                   </>
-                ) : (userRole === 'student' || userRole === 'existing_student') ? (
+                ) : userRole === 'student' ? (
                   <>
                     <div className="grid grid-cols-2 gap-3 mt-4">
                       <div>
@@ -1462,6 +1515,74 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                       className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm mt-4"
                     >
                       Activate ERP Account
+                    </button>
+                  </>
+                ) : userRole === 'existing_student' ? (
+                  <>
+                    <div className="mt-4">
+                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Full Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={userName}
+                        onChange={(e) => setUserName(e.target.value)}
+                        placeholder="John Doe"
+                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="mt-4">
+                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Email Address</label>
+                      <input
+                        type="email"
+                        required
+                        value={userEmail}
+                        onChange={(e) => setUserEmail(e.target.value)}
+                        placeholder="student@amreddy.edu"
+                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Password</label>
+                        <input
+                          type="text" // using text to mimic original behavior
+                          required
+                          value={userPassword}
+                          onChange={(e) => setUserPassword(e.target.value)}
+                          placeholder="e.g. Student@123"
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Roll Number</label>
+                        <input
+                          type="text"
+                          required
+                          value={studRoll}
+                          onChange={(e) => setStudRoll(e.target.value.toUpperCase())}
+                          placeholder="Y26PH001"
+                          className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Course</label>
+                      <select
+                        required
+                        value={studCourse}
+                        onChange={(e) => setStudCourse(e.target.value)}
+                        className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white"
+                      >
+                        <option value="B.PHARM">B.Pharm</option>
+                        <option value="M.PHARM">M.Pharm</option>
+                        <option value="PHARM.D">Pharm.D</option>
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-sm mt-4"
+                    >
+                      Create Account
                     </button>
                   </>
                 ) : (

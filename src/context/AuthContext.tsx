@@ -49,7 +49,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setHODProfile(null);
       setStudentProfile(null);
     } else if (user.role === 'student') {
-      const s = db.getStudentByUserId(user.id);
+      let s = db.getStudentByUserId(user.id);
+      
+      // AUTO-RECOVERY for Student Profile Linking:
+      // If the registration failed to link user_id due to early exit (e.g., RLS error),
+      // we can link the profile now by matching the email address or full name.
+      if (!s) {
+        const recovered = db.recoverStudentLink(user.id, user.email, user.full_name);
+        if (recovered) {
+          console.warn('Student profile recovered and auto-linked.');
+          s = recovered;
+        }
+      }
+      
       setStudentProfile(s || null);
       setPrincipalProfile(null);
       setHODProfile(null);

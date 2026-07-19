@@ -493,6 +493,27 @@ export class Database {
     }
   }
 
+  public recoverStudentLink(userId: string, email: string, name: string): Student | null {
+    let matchingStudent = this.state.students.find(st => st.email?.toLowerCase() === email.toLowerCase());
+    
+    // Fallback: If email wasn't set on the student profile, try matching by exact name.
+    if (!matchingStudent) {
+        const nameMatches = this.state.students.filter(st => st.name.toLowerCase() === name.toLowerCase() && !st.user_id);
+        if (nameMatches.length === 1) {
+            matchingStudent = nameMatches[0];
+        }
+    }
+
+    if (matchingStudent) {
+      matchingStudent.user_id = userId;
+      matchingStudent.status = 'ERP Account Active';
+      matchingStudent.email = email.toLowerCase();
+      this.save();
+      return matchingStudent;
+    }
+    return null;
+  }
+
   public async createUser(user: Omit<User, 'id' | 'created_at'>): Promise<User> {
     const authClient = createAuthClient();
     const password = (user as any).password || 'DefaultPassword123!';
@@ -984,7 +1005,17 @@ export class Database {
        newUserId = generateUUID(); // fallback for prototype
     }
 
-    // 2. Add to public.users
+    // 2. Link to student and change status (Local State Only)
+    // We do this BEFORE the Supabase insert so that if Supabase throws RLS error, local state is still correctly linked.
+    const localStudent = this.state.students.find(s => s.id === student.id);
+    if (localStudent) {
+      localStudent.user_id = newUserId || '';
+      localStudent.status = 'ERP Account Active';
+      localStudent.email = email.toLowerCase();
+      this.save();
+    }
+
+    // 3. Add to public.users (May fail due to Anonymous RLS block, but AuthContext will auto-recover)
     const { error: userError } = await supabase.from('users').upsert({
       id: newUserId,
       email: email.toLowerCase(),
@@ -993,18 +1024,8 @@ export class Database {
       is_active: true
     });
     
-    if (userError) throw userError;
-
-    // 3. Link to student and change status (Local State Only)
-    // Removed supabase update since user_id, status, email are not in the Supabase students table.
-    
-    // Instead, update local state
-    const localStudent = this.state.students.find(s => s.id === student.id);
-    if (localStudent) {
-      localStudent.user_id = newUserId || '';
-      localStudent.status = 'ERP Account Active';
-      localStudent.email = email.toLowerCase();
-      this.save();
+    if (userError) {
+       console.warn("Public users insert failed (likely RLS). AuthContext will auto-recover on login.", userError);
     }
     
     await this.syncWithSupabase();

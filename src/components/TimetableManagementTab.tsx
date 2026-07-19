@@ -76,7 +76,7 @@ export const TimetableManagementTab: React.FC = () => {
       setSlotStart('');
       setSlotEnd('');
       setSlotRoom('');
-      setDbState(db.getRawState());
+      db.fetchAllData().then(setDbState);
     } catch (error: any) {
       showToast(error.message, 'error');
     }
@@ -87,7 +87,7 @@ export const TimetableManagementTab: React.FC = () => {
     try {
       await db.deleteTimetableSlot(id);
       showToast('Timetable slot removed');
-      setDbState(db.getRawState());
+      db.fetchAllData().then(setDbState);
     } catch (error: any) {
       showToast(error.message, 'error');
     }

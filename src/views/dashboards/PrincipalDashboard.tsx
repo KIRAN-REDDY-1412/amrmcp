@@ -67,11 +67,11 @@ export const PrincipalDashboard: React.FC<DashboardProps> = ({ activeTab, search
   const itemsPerPage = 8;
 
   useEffect(() => {
-    setDbState(db.getRawState());
+    db.fetchAllData().then(setDbState);
   }, [activeModal]);
 
   const triggerStateRefresh = () => {
-    setDbState({ ...db.getRawState() });
+    db.fetchAllData().then(setDbState);
   };
 
   // Create HOD

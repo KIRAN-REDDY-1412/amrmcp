@@ -29,48 +29,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [studentProfile, setStudentProfile] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = (user: User) => {
+  const clearProfiles = () => {
+    setPrincipalProfile(null);
+    setHODProfile(null);
+    setFacultyProfile(null);
+    setStudentProfile(null);
+  };
+
+  const loadProfile = async (user: User) => {
+    clearProfiles();
     if (user.role === 'principal') {
-      const p = db.getPrincipalByUserId(user.id);
+      const p = await db.getPrincipalByUserId(user.id);
       setPrincipalProfile(p || null);
-      setHODProfile(null);
-      setFacultyProfile(null);
-      setStudentProfile(null);
     } else if (user.role === 'hod') {
-      const h = db.getHODByUserId(user.id);
+      const h = await db.getHODByUserId(user.id);
       setHODProfile(h || null);
-      setPrincipalProfile(null);
-      setFacultyProfile(null);
-      setStudentProfile(null);
     } else if (user.role === 'faculty') {
-      const f = db.getFacultyByUserId(user.id);
+      const f = await db.getFacultyByUserId(user.id);
       setFacultyProfile(f || null);
-      setPrincipalProfile(null);
-      setHODProfile(null);
-      setStudentProfile(null);
     } else if (user.role === 'student') {
-      let s = db.getStudentByUserId(user.id);
-      
-      // AUTO-RECOVERY for Student Profile Linking:
-      // If the registration failed to link user_id due to early exit (e.g., RLS error),
-      // we can link the profile now by matching the email address or full name.
+      let s = await db.getStudentByUserId(user.id);
       if (!s) {
-        const recovered = db.recoverStudentLink(user.id, user.email, user.full_name);
-        if (recovered) {
+        // Try recovering by email if auth user is created but student record isn't linked
+        const { data: byEmail } = await supabase.from('students').select('*').eq('email', user.email).single();
+        if (byEmail) {
+          await supabase.from('students').update({ user_id: user.id }).eq('id', byEmail.id);
+          s = byEmail;
           console.warn('Student profile recovered and auto-linked.');
-          s = recovered;
         }
       }
-      
       setStudentProfile(s || null);
-      setPrincipalProfile(null);
-      setHODProfile(null);
-      setFacultyProfile(null);
-    } else {
-      setPrincipalProfile(null);
-      setHODProfile(null);
-      setFacultyProfile(null);
-      setStudentProfile(null);
     }
   };
 
@@ -78,12 +66,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session && session.user) {
-        await db.syncWithSupabase();
-        const user = db.getUserById(session.user.id);
+        const user = await db.getUserById(session.user.id);
         if (user) {
           if (user.is_active) {
             setCurrentUser(user);
-            loadProfile(user);
+            await loadProfile(user);
           } else {
             await logout();
           }
@@ -102,18 +89,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        await db.syncWithSupabase();
-        const user = db.getUserById(session.user.id);
+        const user = await db.getUserById(session.user.id);
         if (user && user.is_active) {
           setCurrentUser(user);
-          loadProfile(user);
+          await loadProfile(user);
         }
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
-        setPrincipalProfile(null);
-        setHODProfile(null);
-        setFacultyProfile(null);
-        setStudentProfile(null);
+        clearProfiles();
       }
     });
 
@@ -125,80 +108,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string, role: User['role']) => {
     setLoading(true);
     try {
-      // 1. Sign in with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (authError) {
-        throw authError;
-      }
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('No user data returned from authentication.');
 
-      if (!authData.user) {
-        throw new Error('No user data returned from authentication.');
-      }
-
-      // 2. Sync public tables
-      await db.syncWithSupabase();
-
-      // 3. Verify user role & status
-      let user = db.getUserById(authData.user.id);
+      let user = await db.getUserById(authData.user.id);
       
       if (!user) {
         if (role === 'admin') {
-          // Attempt auto-recovery if public.users is empty or missing admin
           const { data: existingAdmins } = await supabase.from('users').select('id, email').eq('role', 'admin');
           if (!existingAdmins || existingAdmins.length === 0) {
-            console.warn('Admin record missing in public.users, auto-recovering...');
             await supabase.from('users').insert([{
-              id: authData.user.id,
-              email: email,
-              role: 'admin',
-              full_name: 'System Admin',
-              is_active: true
+              id: authData.user.id, email, role: 'admin', full_name: 'System Admin', is_active: true
             }]);
-            await db.syncWithSupabase();
-            user = db.getUserById(authData.user.id);
+            user = await db.getUserById(authData.user.id);
           } else {
             await supabase.auth.signOut();
-            throw new Error(`User record not found. The registered admin is ${existingAdmins[0]?.email}. Please use the correct email.`);
+            throw new Error(`The registered admin is ${existingAdmins[0]?.email}.`);
           }
-        } else {
-          // DIRECT SUPABASE FALLBACK:
-          // If not found in local state, fetch directly from Supabase users table
-          const { data: remoteUser, error: remoteError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', authData.user.id)
-            .single();
-
-          if (remoteUser) {
-            user = remoteUser as User;
-            // Ensure they get pushed to local state to fix the gap
-            db.forceAddUserToLocalState(user);
-          } else if (authData.user.user_metadata && authData.user.user_metadata.role) {
-            // AUTO-RECOVERY: If they have an auth account but no public.users record (e.g. failed due to RLS during registration)
-            // They are authenticated now, so they can insert their own record.
-            console.warn('User record missing in public.users, auto-recovering from auth metadata...');
-            const newUserData: User = {
+        } else if (authData.user.user_metadata && authData.user.user_metadata.role) {
+            const newUserData = {
               id: authData.user.id,
               email: authData.user.email || '',
               role: authData.user.user_metadata.role,
               full_name: authData.user.user_metadata.full_name || 'Student User',
               is_active: true,
-              created_at: new Date().toISOString()
             };
-            
             await supabase.from('users').insert([newUserData]);
-            user = newUserData;
-            db.forceAddUserToLocalState(user);
-          }
+            user = newUserData as User;
         }
 
         if (!user) {
           await supabase.auth.signOut();
-          throw new Error('User record not found in system database or Supabase.');
+          throw new Error('User record not found in Supabase.');
         }
       }
 
@@ -212,12 +158,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Your account is deactivated. Contact system administrator.');
       }
 
-      // Success
       setCurrentUser(user);
-      loadProfile(user);
+      await loadProfile(user);
       await db.logAction(user.id, user.email, user.role, 'Login', 'User successfully logged in via Supabase.');
-      
-      // Redirect
       navigation.navigate('dashboard');
     } catch (err: any) {
       setLoading(false);
@@ -230,65 +173,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     if (currentUser) {
       try {
-        await db.logAction(
-          currentUser.id,
-          currentUser.email,
-          currentUser.role,
-          'Logout',
-          'User successfully logged out.'
-        );
+        await db.logAction(currentUser.id, currentUser.email, currentUser.role, 'Logout', 'User successfully logged out.');
       } catch (e) {
         console.warn('Failed to log logout action:', e);
       }
     }
     await supabase.auth.signOut();
     setCurrentUser(null);
-    setPrincipalProfile(null);
-    setHODProfile(null);
-    setFacultyProfile(null);
-    setStudentProfile(null);
+    clearProfiles();
     navigation.navigate('landing');
   };
 
   const registerSuperAdmin = async (name: string, email: string, password: string) => {
     setLoading(true);
     try {
-      // Verify database isn't already initialized
-      // We check if any users exist in the cache (we'll fetch users table specifically first to be sure)
-      const { data: existingUsers, error: checkError } = await supabase.from('users').select('id');
-      if (checkError) {
-        console.warn('Error checking existing users:', checkError);
-      }
-      
+      const { data: existingUsers } = await supabase.from('users').select('id').limit(1);
       if (existingUsers && existingUsers.length > 0) {
         throw new Error('Admin registration is closed. Database is already initialized.');
       }
 
-      // 1. Sign up user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
+      const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
       if (authError) throw authError;
       if (!authData.user) throw new Error('Sign-up failed: no user data.');
 
       const newUserId = authData.user.id;
-
-      // 2. Insert user into public.users
       const { error: insertError } = await supabase.from('users').insert([{
-        id: newUserId,
-        email,
-        role: 'admin',
-        full_name: name,
-        is_active: true,
+        id: newUserId, email, role: 'admin', full_name: name, is_active: true,
       }]);
 
       if (insertError) throw insertError;
 
-      // Sync and log
-      await db.syncWithSupabase();
-      const admin = db.getUserById(newUserId);
+      const admin = await db.getUserById(newUserId);
       if (admin) {
         setCurrentUser(admin);
         await db.logAction(admin.id, admin.email, admin.role, 'Database Setup', 'Initialized system and created Super Admin account.');
@@ -332,7 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (userId: string, _newPassword: string) => {
-    const user = db.getUserById(userId);
+    const user = await db.getUserById(userId);
     if (!user) return;
     
     await db.logAction(
@@ -343,13 +258,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       `Requested password reset link for user: ${user.email}`
     );
 
-    // Call Supabase password reset
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
       redirectTo: window.location.origin,
     });
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
   };
 
   return (

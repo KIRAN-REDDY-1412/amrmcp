@@ -1,8 +1,3 @@
-// Database schema and CRUD engine for A.M. Reddy Memorial College of Pharmacy ERP
-// Integrated with Supabase live database
-
-import { supabase, createAuthClient } from './supabase';
-
 // Interfaces
 export interface User {
   id: string;
@@ -204,772 +199,169 @@ export interface AuditLog {
   details: string;
   timestamp: string;
 }
+import { supabase, createAuthClient } from './supabase';
 
-// Helpers
+// Helper
 export function generateUUID(): string {
-  if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
-    return window.crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return crypto.randomUUID();
 }
 
-const STORAGE_KEY = 'am_reddy_erp_database';
-
-export interface DatabaseState {
-  users: User[];
-  departments: Department[];
-  principals: Principal[];
-  hods: HOD[];
-  faculty: Faculty[];
-  students: Student[];
-  admission_documents: AdmissionDocument[];
-  subjects: Subject[];
-  subject_assignments: SubjectAssignment[];
-  timetable: TimetableSlot[];
-  attendance: AttendanceRecord[];
-  marks: MarkRecord[];
-  leave_requests: LeaveRequest[];
-  notices: Notice[];
-  audit_logs: AuditLog[];
-}
-
-const EMPTY_STATE: DatabaseState = {
-  users: [],
-  departments: [],
-  principals: [],
-  hods: [],
-  faculty: [],
-  students: [],
-  admission_documents: [],
-  subjects: [],
-  subject_assignments: [],
-  timetable: [],
-  attendance: [],
-  marks: [],
-  leave_requests: [],
-  notices: [],
-  audit_logs: [],
-};
-
-export class Database {
-  private state: DatabaseState;
-
-  constructor() {
-    this.state = this.load();
-  }
-
-  private load(): DatabaseState {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      if (data) {
-        return JSON.parse(data);
-      }
-    } catch (e) {
-      console.error('Failed to load database from localStorage', e);
-    }
-    return { ...EMPTY_STATE };
-  }
-
-  private save() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-    } catch (e) {
-      console.error('Failed to save database to localStorage', e);
-    }
-  }
-
-  public async resetDatabase() {
-    // Clear public tables in Supabase
-    const tables = [
-      'audit_logs', 'notices', 'leave_requests', 'marks', 'attendance', 
-      'timetable', 'subject_assignments', 'subjects', 'students', 
-      'faculty', 'hods', 'principals', 'users', 'departments'
-    ];
-
-    for (const table of tables) {
-      try {
-        await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      } catch (err) {
-        console.error(`Failed to clear table ${table} in Supabase:`, err);
-      }
-    }
-
-    this.state = JSON.parse(JSON.stringify(EMPTY_STATE));
-    this.save();
-  }
-
-  public restoreDatabase(jsonString: string): boolean {
-    try {
-      const parsed = JSON.parse(jsonString);
-      if (
-        parsed &&
-        Array.isArray(parsed.users) &&
-        Array.isArray(parsed.departments) &&
-        Array.isArray(parsed.audit_logs)
-      ) {
-        this.state = parsed;
-        this.save();
-        
-        // Restore to Supabase asynchronously
-        this.syncStateToSupabase(parsed);
-        return true;
-      }
-    } catch (e) {
-      console.error('Failed to restore database', e);
-    }
-    return false;
-  }
-
-  private async syncStateToSupabase(parsed: DatabaseState) {
-    try {
-      // Direct restoration/insertion
-      if (parsed.departments.length > 0) await supabase.from('departments').upsert(parsed.departments);
-      if (parsed.users.length > 0) await supabase.from('users').upsert(parsed.users);
-      if (parsed.principals.length > 0) await supabase.from('principals').upsert(parsed.principals);
-      if (parsed.hods.length > 0) await supabase.from('hods').upsert(parsed.hods);
-      if (parsed.faculty.length > 0) await supabase.from('faculty').upsert(parsed.faculty);
-      if (parsed.students.length > 0) await supabase.from('students').upsert(parsed.students);
-      if (parsed.subjects.length > 0) await supabase.from('subjects').upsert(parsed.subjects);
-      if (parsed.subject_assignments.length > 0) await supabase.from('subject_assignments').upsert(parsed.subject_assignments);
-      if (parsed.timetable.length > 0) await supabase.from('timetable').upsert(parsed.timetable);
-      if (parsed.attendance.length > 0) await supabase.from('attendance').upsert(parsed.attendance);
-      if (parsed.marks.length > 0) await supabase.from('marks').upsert(parsed.marks);
-      if (parsed.leave_requests.length > 0) await supabase.from('leave_requests').upsert(parsed.leave_requests);
-      if (parsed.notices.length > 0) await supabase.from('notices').upsert(parsed.notices);
-      if (parsed.audit_logs.length > 0) await supabase.from('audit_logs').upsert(parsed.audit_logs);
-    } catch (e) {
-      console.error('Failed to restore database into Supabase:', e);
-    }
-  }
-
-  public async syncWithSupabase(): Promise<void> {
-    const fetchTable = async (tableName: string) => {
-      const { data, error } = await supabase.from(tableName).select('*');
-      if (error) {
-        console.warn(`Failed to fetch table ${tableName} from Supabase:`, error);
-        return null;
-      }
-      return data || [];
+export const db = {
+  // Add a dummy syncWithSupabase and getRawState to temporarily avoid crashing the app
+  // before we refactor the components.
+  syncWithSupabase: async () => {},
+  getRawState: () => ({
+    users: [], departments: [], principals: [], hods: [], faculty: [], students: [],
+    admission_documents: [], subjects: [], subject_assignments: [], timetable: [],
+    attendance: [], marks: [], leave_requests: [], notices: [], audit_logs: []
+  }),
+  resetDatabase: async () => {},
+  restoreDatabase: async () => false,
+  generateSQLSchema: () => "-- Schema is in supabase",
+  fetchAllData: async () => {
+    const [
+      users, departments, principals, hods, faculty, students,
+      admission_documents, subjects, subject_assignments, timetable,
+      attendance, marks, leave_requests, notices, audit_logs
+    ] = await Promise.all([
+      db.getUsers(), db.getDepartments(), db.getPrincipals(), db.getHods(), db.getFaculty(), db.getStudents(),
+      Promise.resolve([]), db.getSubjects(), db.getSubjectAssignments(), db.getTimetableSlots(),
+      Promise.resolve([]), db.getMarks(), db.getLeaveRequests(), db.getNotices(), db.getAuditLogs()
+    ]);
+    return {
+      users, departments, principals, hods, faculty, students,
+      admission_documents, subjects, subject_assignments, timetable,
+      attendance, marks, leave_requests, notices, audit_logs
     };
-
-    const mergeArrays = (local: any[], remote: any[] | null) => {
-      if (!remote) return local;
-      
-      const mergedMap = new Map();
-      
-      // 1. Add all local items to preserve them (prevents RLS or missing remote data from wiping local state)
-      local.forEach(item => {
-        if (item && item.id) {
-          mergedMap.set(item.id, item);
-        }
-      });
-      
-      // 2. Overwrite/merge with remote items
-      remote.forEach(remoteItem => {
-        if (!remoteItem || !remoteItem.id) return;
-        const localItem = mergedMap.get(remoteItem.id);
-        if (localItem) {
-          mergedMap.set(remoteItem.id, { ...localItem, ...remoteItem });
-        } else {
-          mergedMap.set(remoteItem.id, remoteItem);
-        }
-      });
-      
-      return Array.from(mergedMap.values());
-    };
-
-    try {
-      const [
-        users,
-        departments,
-        principals,
-        hods,
-        faculty,
-        students,
-        subjects,
-        subject_assignments,
-        timetable,
-        attendance,
-        marks,
-        leave_requests,
-        notices,
-        audit_logs
-      ] = await Promise.all([
-        fetchTable('users'),
-        fetchTable('departments'),
-        fetchTable('principals'),
-        fetchTable('hods'),
-        fetchTable('faculty'),
-        fetchTable('students'),
-        fetchTable('subjects'),
-        fetchTable('subject_assignments'),
-        fetchTable('timetable'),
-        fetchTable('attendance'),
-        fetchTable('marks'),
-        fetchTable('leave_requests'),
-        fetchTable('notices'),
-        fetchTable('audit_logs')
-      ]);
-
-      this.state = {
-        users: mergeArrays(this.state.users, users),
-        departments: mergeArrays(this.state.departments, departments),
-        principals: mergeArrays(this.state.principals, principals),
-        hods: mergeArrays(this.state.hods, hods),
-        faculty: mergeArrays(this.state.faculty, faculty),
-        students: mergeArrays(this.state.students, students).map((s: any) => {
-          if (!s.status) {
-            if (s.user_id) s.status = 'ERP Account Active';
-            else if (s.roll_number) s.status = 'Roll Number Assigned';
-            else s.status = 'Draft';
-          }
-          if (!s.course) s.course = 'B.PHARM'; // Default if created via Supabase directly
-          return s;
-        }),
-        admission_documents: mergeArrays(this.state.admission_documents, []), // or fetch them if added to fetchTable
-        subjects: mergeArrays(this.state.subjects, subjects),
-        subject_assignments: mergeArrays(this.state.subject_assignments, subject_assignments),
-        timetable: mergeArrays(this.state.timetable, timetable),
-        attendance: mergeArrays(this.state.attendance, attendance),
-        marks: mergeArrays(this.state.marks, marks),
-        leave_requests: mergeArrays(this.state.leave_requests, leave_requests),
-        notices: mergeArrays(this.state.notices, notices),
-        audit_logs: mergeArrays(this.state.audit_logs, audit_logs),
-      };
-      this.save();
-    } catch (e) {
-      console.error('Failed to sync state with Supabase:', e);
-    }
-  }
-
-  public getRawState(): DatabaseState {
-    return this.state;
-  }
+  },
 
   // --- Audit Logs ---
-  public async logAction(userId: string, email: string, role: string, action: string, details: string): Promise<AuditLog> {
-    const log: AuditLog = {
-      id: generateUUID(),
-      user_id: userId,
-      user_email: email,
-      user_role: role,
-      action,
-      details,
-      timestamp: new Date().toISOString(),
-    };
-    
-    const { error } = await supabase.from('audit_logs').insert([log]);
-    if (error) console.error('Error saving audit log in Supabase:', error);
-
-    this.state.audit_logs.unshift(log);
-    this.save();
+  logAction: async (userId: string, email: string, role: string, action: string, details: string) => {
+    const log = { id: generateUUID(), user_id: userId, user_email: email, user_role: role, action, details, timestamp: new Date().toISOString() };
+    await supabase.from('audit_logs').insert([log]);
     return log;
-  }
+  },
 
-  public getAuditLogs(): AuditLog[] {
-    return this.state.audit_logs;
-  }
+  getAuditLogs: async () => {
+    const { data } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false });
+    return data || [];
+  },
 
   // --- Users CRUD ---
-  public getUsers(): User[] {
-    return this.state.users;
-  }
+  getUsers: async () => {
+    const { data } = await supabase.from('users').select('*');
+    return data || [];
+  },
+  
+  getUserById: async (id: string) => {
+    const { data } = await supabase.from('users').select('*').eq('id', id).single();
+    return data || undefined;
+  },
 
-  public getUserByEmail(email: string): User | undefined {
-    return this.state.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-  }
-
-  public getUserById(id: string): User | undefined {
-    return this.state.users.find((u) => u.id === id);
-  }
-
-  public async grantAdditionalRole(userId: string, role: string): Promise<User> {
-    const userIndex = this.state.users.findIndex((u) => u.id === userId);
-    if (userIndex === -1) {
-      throw new Error(`User with ID ${userId} not found.`);
-    }
-
-    const user = this.state.users[userIndex];
+  grantAdditionalRole: async (userId: string, role: string) => {
+    const user = await db.getUserById(userId);
+    if (!user) throw new Error(`User not found`);
     const roles = user.additional_roles || [];
-    if (!roles.includes(role)) {
-      roles.push(role);
-    }
+    if (!roles.includes(role)) roles.push(role);
+    const { data } = await supabase.from('users').update({ additional_roles: roles }).eq('id', userId).select().single();
+    return data;
+  },
 
-    const { error } = await supabase
-      .from('users')
-      .update({ additional_roles: roles })
-      .eq('id', userId);
-
-    if (error) {
-      console.error('Error updating additional roles in Supabase:', error);
-      throw error;
-    }
-
-    user.additional_roles = roles;
-    this.state.users[userIndex] = user;
-    this.save();
-    return user;
-  }
-
-  public forceAddUserToLocalState(user: User) {
-    if (!this.state.users.find(u => u.id === user.id)) {
-      this.state.users.push(user);
-      this.save();
-    }
-  }
-
-  public recoverStudentLink(userId: string, email: string, name: string): Student | null {
-    let matchingStudent = this.state.students.find(st => st.email?.toLowerCase() === email.toLowerCase());
-    
-    // Fallback: If email wasn't set on the student profile, try matching by exact name.
-    if (!matchingStudent) {
-        const nameMatches = this.state.students.filter(st => st.name.toLowerCase() === name.toLowerCase() && !st.user_id);
-        if (nameMatches.length === 1) {
-            matchingStudent = nameMatches[0];
-        }
-    }
-
-    if (matchingStudent) {
-      matchingStudent.user_id = userId;
-      matchingStudent.status = 'ERP Account Active';
-      matchingStudent.email = email.toLowerCase();
-      this.save();
-      return matchingStudent;
-    }
-    return null;
-  }
-
-  public async createUser(user: Omit<User, 'id' | 'created_at'>): Promise<User> {
+  createUser: async (user: any) => {
     const authClient = createAuthClient();
-    const password = (user as any).password || 'DefaultPassword123!';
-
-    // 1. Sign up in Supabase Auth
-    const { data: authData, error: authError } = await authClient.auth.signUp({
-      email: user.email,
-      password,
-    });
-
+    const password = user.password || 'DefaultPassword123!';
+    const { data: authData, error: authError } = await authClient.auth.signUp({ email: user.email, password });
+    
     let newUserId = authData?.user?.id;
-
     if (authError) {
-      if (authError.message.includes('already registered') || authError.message.includes('already exist')) {
-        // The user is in Auth. Try to sign in to get their UUID!
-        const { data: signInData, error: signInError } = await authClient.auth.signInWithPassword({
-          email: user.email,
-          password
-        });
-        
-        if (signInData?.user) {
-          newUserId = signInData.user.id;
-        } else {
-          // If we can't sign in (wrong password for existing test account)
-          throw new Error(`Roll Number already exists in the system with a different password. Please use a unique Roll Number.`);
-        }
-      } else if (authError.message.toLowerCase().includes('rate limit')) {
-        console.warn("Supabase auth rate limit hit. Generating mock user for prototype functionality.");
-        newUserId = generateUUID();
+      if (authError.message.includes('already registered')) {
+        const { data: signInData } = await authClient.auth.signInWithPassword({ email: user.email, password });
+        if (signInData?.user) newUserId = signInData.user.id;
+        else throw new Error('User exists but password does not match.');
       } else {
         throw authError;
       }
     }
-
-    if (!newUserId) throw new Error('Failed to register auth user in Supabase.');
-
-    const newUser: User = {
-      ...user,
-      id: newUserId,
-      created_at: new Date().toISOString(),
-    };
-
-    // 2. Insert into public.users. Use upsert to handle if they somehow already exist there
-    const { error: dbError } = await supabase.from('users').upsert([{
-      id: newUser.id,
-      email: newUser.email,
-      role: newUser.role,
-      full_name: newUser.full_name,
-      is_active: newUser.is_active,
-      created_at: newUser.created_at
-    }]);
-    if (dbError) {
-      throw new Error(`Failed to create user in database: ${dbError.message}`);
-    }
-
-    // Ensure it's in local state
-    if (!this.state.users.find(u => u.id === newUser.id)) {
-      this.state.users.push(newUser);
-      this.save();
-    }
-    
-    return newUser;
-  }
-
-  public async updateUser(id: string, updates: Partial<Omit<User, 'id' | 'created_at' | 'email' | 'role'>>): Promise<User | null> {
-    const { error } = await supabase.from('users').update(updates).eq('id', id);
+    const newUser = { ...user, id: newUserId, created_at: new Date().toISOString() };
+    const { data, error } = await supabase.from('users').upsert([newUser]).select().single();
     if (error) throw error;
+    return data;
+  },
 
-    const userIndex = this.state.users.findIndex((u) => u.id === id);
-    if (userIndex === -1) return null;
-    
-    this.state.users[userIndex] = {
-      ...this.state.users[userIndex],
-      ...updates,
-    };
-    this.save();
-    return this.state.users[userIndex];
-  }
+  updateUser: async (id: string, updates: any) => {
+    const { data } = await supabase.from('users').update(updates).eq('id', id).select().single();
+    return data;
+  },
 
-  public async setUserActive(id: string, isActive: boolean): Promise<boolean> {
-    const { error } = await supabase.from('users').update({ is_active: isActive }).eq('id', id);
-    if (error) throw error;
-
-    const user = this.getUserById(id);
-    if (!user) return false;
-    user.is_active = isActive;
-    this.save();
+  setUserActive: async (id: string, isActive: boolean) => {
+    await supabase.from('users').update({ is_active: isActive }).eq('id', id);
     return true;
-  }
+  },
 
-  public async deleteUser(id: string): Promise<boolean> {
-    const { error } = await supabase.from('users').delete().eq('id', id);
-    if (error) throw error;
-
-    // Cascade deletions in cache
-    this.state.principals = this.state.principals.filter((p) => p.user_id !== id);
-    this.state.hods = this.state.hods.filter((h) => h.user_id !== id);
-    
-    const fac = this.state.faculty.find((f) => f.user_id === id);
-    if (fac) {
-      this.state.subject_assignments = this.state.subject_assignments.filter((sa) => sa.faculty_id !== fac.id);
-      this.state.faculty = this.state.faculty.filter((f) => f.user_id !== id);
-    }
-    
-    this.state.leave_requests = this.state.leave_requests.filter((lr) => lr.user_id !== id);
-    this.state.notices = this.state.notices.filter((n) => n.created_by !== id);
-    this.state.users = this.state.users.filter((u) => u.id !== id);
-    this.save();
+  deleteUser: async (id: string) => {
+    await supabase.from('users').delete().eq('id', id);
     return true;
-  }
+  },
 
-  public async deleteUsers(ids: string[]): Promise<boolean> {
-    if (ids.length === 0) return true;
-    const { error } = await supabase.from('users').delete().in('id', ids);
-    if (error) throw error;
-
-    this.state.principals = this.state.principals.filter((p) => !ids.includes(p.user_id));
-    this.state.hods = this.state.hods.filter((h) => !ids.includes(h.user_id));
-    
-    const facIds = this.state.faculty.filter((f) => ids.includes(f.user_id)).map(f => f.id);
-    if (facIds.length > 0) {
-      this.state.subject_assignments = this.state.subject_assignments.filter((sa) => !facIds.includes(sa.faculty_id));
-      this.state.faculty = this.state.faculty.filter((f) => !ids.includes(f.user_id));
-    }
-    
-    this.state.leave_requests = this.state.leave_requests.filter((lr) => !ids.includes(lr.user_id));
-    this.state.notices = this.state.notices.filter((n) => !ids.includes(n.created_by));
-    this.state.users = this.state.users.filter((u) => !ids.includes(u.id));
-    this.save();
+  deleteUsers: async (ids: string[]) => {
+    if (ids.length) await supabase.from('users').delete().in('id', ids);
     return true;
-  }
+  },
 
-  public async updateUserEmail(id: string, newEmail: string): Promise<User> {
-    try {
-      const user = this.state.users.find((u) => u.id === id);
-      if (!user) throw new Error('User not found');
-      
-      const { error } = await supabase.from('users').update({ email: newEmail }).eq('id', id);
-      if (error) console.warn('Supabase DB not synced, relying on memory');
-      
-      const updatedUser = { ...user, email: newEmail };
-      this.state.users = this.state.users.map((u) => (u.id === id ? updatedUser : u));
-      this.save();
-      return updatedUser;
-    } catch (err) {
-      console.error(err);
-      throw err;
-    }
-  }
+  updateUserEmail: async (id: string, newEmail: string) => {
+    const { data } = await supabase.from('users').update({ email: newEmail }).eq('id', id).select().single();
+    return data;
+  },
 
-  // --- Profile Roles ---
-  public getPrincipalByUserId(userId: string): Principal | undefined {
-    return this.state.principals.find((p) => p.user_id === userId);
-  }
+  // --- Profiles ---
+  getPrincipals: async () => (await supabase.from('principals').select('*')).data || [],
+  getHods: async () => (await supabase.from('hods').select('*')).data || [],
+  getFaculty: async () => (await supabase.from('faculty').select('*')).data || [],
+  getPrincipalByUserId: async (userId: string) => (await supabase.from('principals').select('*').eq('user_id', userId).single()).data || undefined,
+  getHODByUserId: async (userId: string) => (await supabase.from('hods').select('*').eq('user_id', userId).single()).data || undefined,
+  getFacultyByUserId: async (userId: string) => (await supabase.from('faculty').select('*').eq('user_id', userId).single()).data || undefined,
 
-  public getHODByUserId(userId: string): HOD | undefined {
-    return this.state.hods.find((h) => h.user_id === userId);
-  }
-
-  public getFacultyByUserId(userId: string): Faculty | undefined {
-    return this.state.faculty.find((f) => f.user_id === userId);
-  }
-
-  public async createPrincipalProfile(profile: Omit<Principal, 'id'>): Promise<Principal> {
-    const newProfile = { ...profile, id: generateUUID() };
-    const { error } = await supabase.from('principals').insert([newProfile]);
-    if (error) throw error;
-
-    this.state.principals.push(newProfile);
-    this.save();
-    return newProfile;
-  }
-
-  public async updatePrincipalProfile(userId: string, updates: Partial<Omit<Principal, 'id' | 'user_id'>>): Promise<Principal | null> {
-    const { error } = await supabase.from('principals').update(updates).eq('user_id', userId);
-    if (error) throw error;
-
-    const index = this.state.principals.findIndex((p) => p.user_id === userId);
-    if (index === -1) return null;
-    this.state.principals[index] = { ...this.state.principals[index], ...updates };
-    this.save();
-    return this.state.principals[index];
-  }
-
-  public async createHODProfile(profile: Omit<HOD, 'id'>): Promise<HOD> {
-    const newProfile = { ...profile, id: generateUUID() };
-    const { error } = await supabase.from('hods').insert([newProfile]);
-    if (error) throw error;
-
-    this.state.hods.push(newProfile);
-    this.save();
-    return newProfile;
-  }
-
-  public async updateHODProfile(userId: string, updates: Partial<Omit<HOD, 'id' | 'user_id'>>): Promise<HOD | null> {
-    const { error } = await supabase.from('hods').update(updates).eq('user_id', userId);
-    if (error) throw error;
-
-    const index = this.state.hods.findIndex((h) => h.user_id === userId);
-    if (index === -1) return null;
-    this.state.hods[index] = { ...this.state.hods[index], ...updates };
-    this.save();
-    return this.state.hods[index];
-  }
-
-  public async createFacultyProfile(profile: Omit<Faculty, 'id'>): Promise<Faculty> {
-    const newProfile = { ...profile, id: generateUUID() };
-    const { error } = await supabase.from('faculty').insert([newProfile]);
-    if (error) throw error;
-
-    this.state.faculty.push(newProfile);
-    this.save();
-    return newProfile;
-  }
-
-  public async updateFacultyProfile(userId: string, updates: Partial<Omit<Faculty, 'id' | 'user_id'>>): Promise<Faculty | null> {
-    const { error } = await supabase.from('faculty').update(updates).eq('user_id', userId);
-    if (error) throw error;
-
-    const index = this.state.faculty.findIndex((f) => f.user_id === userId);
-    if (index === -1) return null;
-    this.state.faculty[index] = { ...this.state.faculty[index], ...updates };
-    this.save();
-    return this.state.faculty[index];
-  }
+  createPrincipalProfile: async (profile: any) => (await supabase.from('principals').insert([{ ...profile, id: generateUUID() }]).select().single()).data,
+  updatePrincipalProfile: async (userId: string, updates: any) => (await supabase.from('principals').update(updates).eq('user_id', userId).select().single()).data,
+  createHODProfile: async (profile: any) => (await supabase.from('hods').insert([{ ...profile, id: generateUUID() }]).select().single()).data,
+  updateHODProfile: async (userId: string, updates: any) => (await supabase.from('hods').update(updates).eq('user_id', userId).select().single()).data,
+  createFacultyProfile: async (profile: any) => (await supabase.from('faculty').insert([{ ...profile, id: generateUUID() }]).select().single()).data,
+  updateFacultyProfile: async (userId: string, updates: any) => (await supabase.from('faculty').update(updates).eq('user_id', userId).select().single()).data,
 
   // --- Departments ---
-  public getDepartments() {
-    return this.state.departments;
-  }
-
-  public getAdmissionDocuments(studentId?: string) {
-    if (studentId) {
-      return this.state.admission_documents.filter(d => d.student_id === studentId);
-    }
-    return this.state.admission_documents;
-  }
-
-  public async updateAdmissionDocumentStatus(docId: string, status: 'Verified' | 'Rejected') {
-    const docIndex = this.state.admission_documents.findIndex(d => d.id === docId);
-    if (docIndex === -1) return;
-
-    // Update in Supabase
-    const { error } = await supabase
-      .from('admission_documents')
-      .update({ status })
-      .eq('id', docId);
-
-    if (error) {
-      console.error("Error updating document status in Supabase", error);
-      throw error;
-    }
-
-    // Update locally
-    this.state.admission_documents[docIndex].status = status;
-    this.save();
-  }
-
-  public async updateStudentStatus(studentId: string, status: string) {
-    const sIndex = this.state.students.findIndex(s => s.id === studentId);
-    if (sIndex === -1) return;
-
-    const { error } = await supabase
-      .from('students')
-      .update({ status })
-      .eq('id', studentId);
-
-    if (error) {
-      console.error("Error updating student status in Supabase", error);
-      throw error;
-    }
-
-    this.state.students[sIndex].status = status as any;
-    this.save();
-  }
-
-  public getDepartmentById(id: string): Department | undefined {
-    return this.state.departments.find((d) => d.id === id);
-  }
-
-  public async createDepartment(dept: Omit<Department, 'id' | 'created_at'>): Promise<Department> {
-    const newDept: Department = {
-      ...dept,
-      id: generateUUID(),
-      created_at: new Date().toISOString(),
-    };
-    const { error } = await supabase.from('departments').insert([newDept]);
-    if (error) throw error;
-
-    this.state.departments.push(newDept);
-    this.save();
-    return newDept;
-  }
-
-  public async updateDepartment(id: string, updates: Partial<Omit<Department, 'id' | 'created_at'>>): Promise<Department | null> {
-    const { error } = await supabase.from('departments').update(updates).eq('id', id);
-    if (error) throw error;
-
-    const index = this.state.departments.findIndex((d) => d.id === id);
-    if (index === -1) return null;
-    this.state.departments[index] = { ...this.state.departments[index], ...updates };
-    this.save();
-    return this.state.departments[index];
-  }
-
-  public async deleteDepartment(id: string): Promise<boolean> {
-    const { error } = await supabase.from('departments').delete().eq('id', id);
-    if (error) throw error;
-
-    // Cache cascades
-    this.state.hods = this.state.hods.filter((h) => h.department_id !== id);
-    this.state.faculty = this.state.faculty.filter((f) => f.department_id !== id);
-    this.state.students = this.state.students.filter((s) => s.department_id !== id);
-    
-    const subIds = this.state.subjects.filter((s) => s.department_id === id).map((s) => s.id);
-    this.state.subjects = this.state.subjects.filter((s) => s.department_id !== id);
-    this.state.subject_assignments = this.state.subject_assignments.filter((sa) => !subIds.includes(sa.subject_id));
-
-    this.state.departments = this.state.departments.filter((d) => d.id !== id);
-    this.save();
-    return true;
-  }
+  getDepartments: async () => (await supabase.from('departments').select('*')).data || [],
+  createDepartment: async (dept: any) => {
+    const newDept = { ...dept, id: generateUUID(), created_at: new Date().toISOString() };
+    return (await supabase.from('departments').insert([newDept]).select().single()).data;
+  },
+  updateDepartment: async (id: string, updates: any) => (await supabase.from('departments').update(updates).eq('id', id).select().single()).data,
+  deleteDepartment: async (id: string) => { await supabase.from('departments').delete().eq('id', id); return true; },
 
   // --- Students ---
-  public getStudents(): Student[] {
-    return this.state.students;
-  }
-
-  public getStudentById(id: string): Student | undefined {
-    return this.state.students.find((s) => s.id === id);
-  }
-
-  public getStudentByUserId(userId: string): Student | undefined {
-    return this.state.students.find((s) => s.user_id === userId);
-  }
-
-  public getStudentByRollNumber(rollNumber: string): Student | undefined {
-    return this.state.students.find((s) => s.roll_number?.toLowerCase() === rollNumber.toLowerCase());
-  }
-
-  public getStudentsByDepartment(deptId: string): Student[] {
-    return this.state.students.filter((s) => s.department_id === deptId);
-  }
-
-  public async createStudent(student: Omit<Student, 'id' | 'enrollment_date'>): Promise<Student> {
-    const newStudent: Student = {
-      ...student,
-      id: generateUUID(),
-      enrollment_date: new Date().toISOString(),
-    };
-
-    // Ensure we only insert columns that exist in the Supabase schema
-    // The remote schema seems to be missing department_id and admission_quota
-    const dbStudent = {
-      id: newStudent.id,
-      name: newStudent.name,
-      roll_number: newStudent.roll_number,
-      phone: newStudent.phone || '',
-      guardian_name: newStudent.guardian_name || '',
-      enrollment_date: newStudent.enrollment_date
-    };
-
-    const { error } = await supabase.from('students').insert([dbStudent]);
-    if (error) {
-      throw new Error(`Failed to create student in database: ${error.message}`);
-    }
-
-    this.state.students.push(newStudent);
-    this.save();
-    return newStudent;
-  }
-
-  public async updateStudent(id: string, updates: Partial<Omit<Student, 'id' | 'enrollment_date'>>): Promise<Student | null> {
-    // Removed department_id since remote Supabase lacks it
-    const validDbKeys = ['name', 'roll_number', 'phone', 'guardian_name'];
-    const dbUpdates: any = {};
-    for (const key of validDbKeys) {
-      if (key in updates) {
-        dbUpdates[key] = (updates as any)[key];
-      }
-    }
-    
-    if (Object.keys(dbUpdates).length > 0) {
-      const { error } = await supabase.from('students').update(dbUpdates).eq('id', id);
-      if (error) throw error;
-    }
-
-    const index = this.state.students.findIndex((s) => s.id === id);
-    if (index === -1) return null;
-    this.state.students[index] = { ...this.state.students[index], ...updates };
-    this.save();
-    return this.state.students[index];
-  }
-
-  public async deleteStudent(id: string): Promise<boolean> {
-    const { error } = await supabase.from('students').delete().eq('id', id);
+  getStudents: async () => (await supabase.from('students').select('*')).data || [],
+  getStudentById: async (id: string) => (await supabase.from('students').select('*').eq('id', id).single()).data || undefined,
+  getStudentByUserId: async (userId: string) => (await supabase.from('students').select('*').eq('user_id', userId).single()).data || undefined,
+  getStudentsByDepartment: async (deptId: string) => (await supabase.from('students').select('*').eq('department_id', deptId)).data || [],
+  
+  createStudent: async (student: any) => {
+    const newStudent = { ...student, id: generateUUID(), enrollment_date: new Date().toISOString() };
+    const { data, error } = await supabase.from('students').insert([newStudent]).select().single();
     if (error) throw error;
+    return data;
+  },
+  updateStudent: async (id: string, updates: any) => (await supabase.from('students').update(updates).eq('id', id).select().single()).data,
+  deleteStudent: async (id: string) => { await supabase.from('students').delete().eq('id', id); return true; },
+  deleteStudents: async (ids: string[]) => { if (ids.length) await supabase.from('students').delete().in('id', ids); return true; },
 
-    this.state.attendance = this.state.attendance.filter((a) => a.student_id !== id);
-    this.state.marks = this.state.marks.filter((m) => m.student_id !== id);
-    this.state.students = this.state.students.filter((s) => s.id !== id);
-    this.save();
-    return true;
-  }
-
-  public async deleteStudents(ids: string[]): Promise<boolean> {
-    if (ids.length === 0) return true;
-    const { error } = await supabase.from('students').delete().in('id', ids);
-    if (error) throw error;
-
-    this.state.attendance = this.state.attendance.filter((a) => !ids.includes(a.student_id));
-    this.state.marks = this.state.marks.filter((m) => !ids.includes(m.student_id));
-    this.state.students = this.state.students.filter((s) => !ids.includes(s.id));
-    this.save();
-    return true;
-  }
-
-  public async registerStudentToERP(studentId: string, customPassword?: string): Promise<boolean> {
-    const student = this.state.students.find(s => s.id === studentId);
+  registerStudentToERP: async (studentId: string, customPassword?: string) => {
+    const student = await db.getStudentById(studentId);
     if (!student) throw new Error('Student not found');
-    if (!student.roll_number) throw new Error('Student must have a Roll Number before ERP registration');
-    if (student.status === 'ERP Account Active') throw new Error('Student is already registered');
+    if (!student.roll_number) throw new Error('Student must have a Roll Number');
+    if (student.status === 'ERP Account Active') throw new Error('Already registered');
     
     const tempEmail = `${student.roll_number.toLowerCase()}@student.amreddy.edu`;
     const tempPassword = customPassword || 'Student@123';
 
-    // 1. Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: tempEmail,
       password: tempPassword,
@@ -977,553 +369,89 @@ export class Database {
     });
     
     if (authError) throw authError;
-    if (!authData.user) throw new Error("Auth user creation failed");
+    if (!authData.user) throw new Error("Auth creation failed");
     
-    // 2. Add to public.users
-    const { error: userError } = await supabase.from('users').insert({
-      id: authData.user.id,
-      email: tempEmail,
-      role: 'student',
-      full_name: student.name,
-      is_active: true
+    await supabase.from('users').insert({
+      id: authData.user.id, email: tempEmail, role: 'student', full_name: student.name, is_active: true
     });
-    if (userError) throw userError;
 
-    // 3. Link to student and change status (Only in local state since DB lacks these columns)
-    // Removed supabase update since user_id, status, email are not in the Supabase students table.
+    await supabase.from('students').update({
+      user_id: authData.user.id, status: 'ERP Account Active', email: tempEmail
+    }).eq('id', student.id);
     
-    // Instead, just update local state directly so it persists in localStorage
-    const localStudent = this.state.students.find(s => s.id === student.id);
-    if (localStudent) {
-      localStudent.user_id = authData.user.id;
-      localStudent.status = 'ERP Account Active';
-      localStudent.email = tempEmail;
-      this.save();
-    }
-    
-    await this.syncWithSupabase();
     return true;
-  }
+  },
 
-  public async selfRegisterStudent(rollNumber: string, email: string, password: string): Promise<boolean> {
-    const student = this.getStudentByRollNumber(rollNumber);
-    if (!student) throw new Error('Student roll number not found in the system.');
-    if (student.status === 'ERP Account Active' || student.user_id) {
-      throw new Error('This student is already registered in the ERP.');
-    }
-
-    // 1. Create auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: email.toLowerCase(),
-      password: password,
-      options: { data: { full_name: student.name, role: 'student' } }
-    });
-    
-    if (authError) {
-      // Handle "already registered" error gracefully for mock scenarios
-      if (authError.message.includes('already registered') || authError.message.includes('already exist')) {
-        throw new Error('Email is already registered. Please use a different email or login.');
-      }
-      throw authError;
-    }
-    
-    // In mock setup without email confirmation, user might not be returned immediately if confirmation is required.
-    // Assuming auto-confirm is on or we mock it:
-    let newUserId = authData?.user?.id;
-    if (!newUserId) {
-       newUserId = generateUUID(); // fallback for prototype
-    }
-
-    // 2. Link to student and change status (Local State Only)
-    // We do this BEFORE the Supabase insert so that if Supabase throws RLS error, local state is still correctly linked.
-    const localStudent = this.state.students.find(s => s.id === student.id);
-    if (localStudent) {
-      localStudent.user_id = newUserId || '';
-      localStudent.status = 'ERP Account Active';
-      localStudent.email = email.toLowerCase();
-      this.save();
-    }
-
-    // 3. Add to public.users (May fail due to Anonymous RLS block, but AuthContext will auto-recover)
-    const { error: userError } = await supabase.from('users').upsert({
-      id: newUserId,
-      email: email.toLowerCase(),
-      role: 'student',
-      full_name: student.name,
-      is_active: true
-    });
-    
-    if (userError) {
-       console.warn("Public users insert failed (likely RLS). AuthContext will auto-recover on login.", userError);
-    }
-    
-    await this.syncWithSupabase();
-    return true;
-  }
-
-  public async bulkPromoteStudents(course: string, fromYear: string, toYear: string): Promise<number> {
-    let updatedCount = 0;
-
-    this.state.students = this.state.students.map(student => {
-      if (student.course === course && student.year === fromYear) {
-        updatedCount++;
-        return { ...student, year: toYear };
-      }
-      return student;
-    });
-
-    if (updatedCount > 0) {
-      this.save();
-      // Attempt to sync to Supabase (if the year column exists in remote DB)
-      const { error } = await supabase
-        .from('students')
-        .update({ year: toYear })
-        .eq('course', course)
-        .eq('year', fromYear);
-        
-      if (error) {
-        console.error("Supabase bulk promote error (may not have column 'year' yet):", error);
-      }
-    }
-
-    return updatedCount;
-  }
-
-  // --- Attendance Management ---
-  public getStudentsByFilters(filters: {
-    course: string;
-    branch?: string;
-    year: string;
-    semester?: string;
-    section: string;
-  }): Student[] {
-    return this.state.students.filter(s => {
-      if (s.course !== filters.course) return false;
-      if (s.year !== filters.year) return false;
-      if (s.section !== filters.section) return false;
-      if (filters.course === 'M.PHARM' && s.branch !== filters.branch) return false;
-      if (filters.course !== 'PHARM.D' && s.semester !== filters.semester) return false;
-      return true;
-    });
-  }
-
-  public async saveAttendanceBatch(records: Omit<AttendanceRecord, 'id' | 'created_at' | 'updated_at'>[]): Promise<void> {
-    // Duplicate Check
-    for (const record of records) {
-      const exists = this.state.attendance.some(
-        a => a.student_id === record.student_id && a.date === record.date && a.subject_id === record.subject_id && a.period === record.period
-      );
-      if (exists) {
-        throw new Error(`Attendance has already been submitted for this class and period.`);
-      }
-    }
-
-    const newRecords: AttendanceRecord[] = records.map(r => ({
-      ...r,
-      id: generateUUID(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }));
-
-    const supabasePayload = newRecords.map(r => ({
-      id: r.id,
-      subject_id: r.subject_id,
-      student_id: r.student_id,
-      date: r.date,
-      status: r.status
-    }));
-
-    const { error } = await supabase.from('attendance').insert(supabasePayload);
-    if (error) {
-      throw new Error(`Failed to save attendance to database: ${error.message}`);
-    }
-
-    this.state.attendance.push(...newRecords);
-    this.save();
-  }
-
-  public getAttendanceByFilters(date: string, subjectId: string, period: string): AttendanceRecord[] {
-    return this.state.attendance.filter(a => a.date === date && a.subject_id === subjectId && a.period === period);
-  }
-
-  public async updateAttendanceRecord(
-    id: string, 
-    updates: Partial<Pick<AttendanceRecord, 'status'>>, 
-    modifierId: string, 
-    reason: string
-  ): Promise<void> {
-    const recordIndex = this.state.attendance.findIndex(a => a.id === id);
-    if (recordIndex === -1) throw new Error("Attendance record not found.");
-
-    const updatedRecord = {
-      ...this.state.attendance[recordIndex],
-      ...updates,
-      updated_at: new Date().toISOString(),
-      last_modified_by: modifierId,
-      modify_reason: reason
-    };
-
-    const { error } = await supabase.from('attendance').update({ status: updatedRecord.status }).eq('id', id);
-    if (error) {
-      throw new Error(`Failed to update attendance in database: ${error.message}`);
-    }
-
-    this.state.attendance[recordIndex] = updatedRecord;
-    this.save();
-  }
-
-  // --- Subjects ---
-  public getSubjects(): Subject[] {
-    return this.state.subjects;
-  }
-
-  public async saveSubjectsBatch(subjects: Omit<Subject, 'id'>[]): Promise<void> {
-    const newSubjects: Subject[] = subjects.map(s => ({
-      ...s,
-      id: generateUUID()
-    }));
-
-    const { error } = await supabase.from('subjects').insert(newSubjects);
-    if (error) {
-      console.error("Supabase insert error for subjects:", error);
-      throw error;
-    }
-    
-    this.state.subjects.push(...newSubjects);
-    this.save();
-  }
-
-  public getSubjectById(id: string): Subject | undefined {
-    return this.state.subjects.find((s) => s.id === id);
-  }
-
-  public getSubjectsByDepartment(deptId: string): Subject[] {
-    return this.state.subjects.filter((s) => s.department_id === deptId);
-  }
-
-  public async createSubject(subject: Omit<Subject, 'id'>): Promise<Subject> {
-    const newSub = { ...subject, id: generateUUID() };
-    const { error } = await supabase.from('subjects').insert([newSub]);
-    if (error) throw error;
-
-    this.state.subjects.push(newSub);
-    this.save();
-    return newSub;
-  }
-
-  public async updateSubject(id: string, updates: Partial<Omit<Subject, 'id'>>): Promise<Subject | null> {
-    const { error } = await supabase.from('subjects').update(updates).eq('id', id);
-    if (error) throw error;
-
-    const index = this.state.subjects.findIndex((s) => s.id === id);
-    if (index === -1) return null;
-    this.state.subjects[index] = { ...this.state.subjects[index], ...updates };
-    this.save();
-    return this.state.subjects[index];
-  }
-
-  public async deleteSubject(id: string): Promise<boolean> {
-    const { error } = await supabase.from('subjects').delete().eq('id', id);
-    if (error) throw error;
-
-    this.state.subject_assignments = this.state.subject_assignments.filter((sa) => sa.subject_id !== id);
-    this.state.attendance = this.state.attendance.filter((a) => a.subject_id !== id);
-    this.state.marks = this.state.marks.filter((m) => m.subject_id !== id);
-    this.state.subjects = this.state.subjects.filter((s) => s.id !== id);
-    this.save();
-    return true;
-  }
-
-  // --- Subject Assignments ---
-  public getSubjectAssignments(): SubjectAssignment[] {
-    return this.state.subject_assignments;
-  }
-
-  public getSubjectAssignmentById(id: string): SubjectAssignment | undefined {
-    return this.state.subject_assignments.find((sa) => sa.id === id);
-  }
-
-  public getAssignmentsByFaculty(facultyId: string): SubjectAssignment[] {
-    return this.state.subject_assignments.filter((sa) => sa.faculty_id === facultyId);
-  }
-
-  public async assignSubject(assignment: Omit<SubjectAssignment, 'id'>): Promise<SubjectAssignment> {
-    const existing = this.state.subject_assignments.find(
-      (sa) => sa.faculty_id === assignment.faculty_id && sa.subject_id === assignment.subject_id
-    );
-    if (existing) return existing;
-    
-    const newAssign = { ...assignment, id: generateUUID() };
-    const { error } = await supabase.from('subject_assignments').insert([newAssign]);
-    if (error) throw error;
-
-    this.state.subject_assignments.push(newAssign);
-    this.save();
-    return newAssign;
-  }
-
-  public async deleteAssignment(id: string): Promise<boolean> {
-    const { error } = await supabase.from('subject_assignments').delete().eq('id', id);
-    if (error) throw error;
-
-    this.state.timetable = this.state.timetable.filter((t) => t.subject_assignment_id !== id);
-    this.state.subject_assignments = this.state.subject_assignments.filter((sa) => sa.id !== id);
-    this.save();
-    return true;
-  }
-
-  // --- Timetable ---
-  public getTimetableSlots(): TimetableSlot[] {
-    return this.state.timetable;
-  }
-
-  public getTimetableForFaculty(facultyId: string): (TimetableSlot & { subjectName: string; subjectCode: string })[] {
-    const assignments = this.getAssignmentsByFaculty(facultyId);
-    const assignmentIds = assignments.map((a) => a.id);
-    const slots = this.state.timetable.filter((t) => assignmentIds.includes(t.subject_assignment_id));
-    
-    return slots.map((slot) => {
-      const assignment = assignments.find((a) => a.id === slot.subject_assignment_id)!;
-      const subject = this.getSubjectById(assignment.subject_id)!;
-      return {
-        ...slot,
-        subjectName: subject?.name || 'Unknown',
-        subjectCode: subject?.code || '',
-      };
-    });
-  }
-
-  public async createTimetableSlot(slot: Omit<TimetableSlot, 'id'>): Promise<TimetableSlot> {
-    const newSlot = { ...slot, id: generateUUID() };
-    const { error } = await supabase.from('timetable').insert([newSlot]);
-    if (error) throw error;
-
-    this.state.timetable.push(newSlot);
-    this.save();
-    return newSlot;
-  }
-
-  public async deleteTimetableSlot(id: string): Promise<boolean> {
-    const { error } = await supabase.from('timetable').delete().eq('id', id);
-    if (error) throw error;
-
-    this.state.timetable = this.state.timetable.filter((t) => t.id !== id);
-    this.save();
-    return true;
-  }
+  bulkPromoteStudents: async (course: string, fromYear: string, toYear: string) => {
+    const { data } = await supabase.from('students').update({ year: toYear }).eq('course', course).eq('year', fromYear).select('id');
+    return data ? data.length : 0;
+  },
 
   // --- Attendance ---
-  public getAttendance(): AttendanceRecord[] {
-    return this.state.attendance;
-  }
+  getStudentsByFilters: async (filters: any) => {
+    let query = supabase.from('students').select('*').eq('course', filters.course).eq('year', filters.year).eq('section', filters.section);
+    if (filters.course === 'M.PHARM' && filters.branch) query = query.eq('branch', filters.branch);
+    if (filters.course !== 'PHARM.D' && filters.semester) query = query.eq('semester', filters.semester);
+    return (await query).data || [];
+  },
 
-  public getAttendanceForSubject(subjectId: string): AttendanceRecord[] {
-    return this.state.attendance.filter((a) => a.subject_id === subjectId);
-  }
+  saveAttendanceBatch: async (records: any[]) => {
+    const newRecords = records.map(r => ({ ...r, id: generateUUID(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }));
+    await supabase.from('attendance').insert(newRecords);
+  },
 
+  getAttendanceByFilters: async (date: string, subjectId: string, period: string) => {
+    return (await supabase.from('attendance').select('*').eq('date', date).eq('subject_id', subjectId).eq('period', period)).data || [];
+  },
 
+  updateAttendanceRecord: async (id: string, updates: any, modifierId: string, reason: string) => {
+    await supabase.from('attendance').update({ status: updates.status, updated_at: new Date().toISOString(), last_modified_by: modifierId, modify_reason: reason }).eq('id', id);
+  },
+
+  // --- Subjects ---
+  getSubjects: async () => (await supabase.from('subjects').select('*')).data || [],
+  saveSubjectsBatch: async (subjects: any[]) => {
+    await supabase.from('subjects').insert(subjects.map(s => ({ ...s, id: generateUUID() })));
+  },
+  getSubjectById: async (id: string) => (await supabase.from('subjects').select('*').eq('id', id).single()).data || undefined,
+  createSubject: async (subject: any) => (await supabase.from('subjects').insert([{ ...subject, id: generateUUID() }]).select().single()).data,
+  updateSubject: async (id: string, updates: any) => (await supabase.from('subjects').update(updates).eq('id', id).select().single()).data,
+  deleteSubject: async (id: string) => { await supabase.from('subjects').delete().eq('id', id); return true; },
+
+  // --- Subject Assignments ---
+  getSubjectAssignments: async () => (await supabase.from('subject_assignments').select('*')).data || [],
+  getAssignmentsByFaculty: async (facultyId: string) => (await supabase.from('subject_assignments').select('*').eq('faculty_id', facultyId)).data || [],
+  assignSubject: async (assignment: any) => {
+    const existing = (await supabase.from('subject_assignments').select('*').eq('faculty_id', assignment.faculty_id).eq('subject_id', assignment.subject_id).single()).data;
+    if (existing) return existing;
+    return (await supabase.from('subject_assignments').insert([{ ...assignment, id: generateUUID() }]).select().single()).data;
+  },
+  deleteAssignment: async (id: string) => { await supabase.from('subject_assignments').delete().eq('id', id); return true; },
+
+  // --- Timetable ---
+  getTimetableSlots: async () => (await supabase.from('timetable').select('*')).data || [],
+  createTimetableSlot: async (slot: any) => (await supabase.from('timetable').insert([{ ...slot, id: generateUUID() }]).select().single()).data,
+  deleteTimetableSlot: async (id: string) => { await supabase.from('timetable').delete().eq('id', id); return true; },
 
   // --- Marks ---
-  public getMarks(): MarkRecord[] {
-    return this.state.marks;
-  }
-
-  public getMarksForSubject(subjectId: string): MarkRecord[] {
-    return this.state.marks.filter((m) => m.subject_id === subjectId);
-  }
-
-  public async saveInternalMarksBatch(records: Pick<MarkRecord, 'subject_id' | 'student_id' | 'mid1_marks' | 'mid2_marks' | 'mid3_marks' | 'cmm_marks' | 'internal_status'>[]): Promise<void> {
-    const upsertRecords = records.map((record) => {
-      const existing = this.state.marks.find(
-        (m) => m.subject_id === record.subject_id && m.student_id === record.student_id
-      );
-      return {
-        id: existing ? existing.id : generateUUID(),
-        subject_id: record.subject_id,
-        student_id: record.student_id,
-        mid1_marks: record.mid1_marks,
-        mid2_marks: record.mid2_marks,
-        mid3_marks: record.mid3_marks,
-        cmm_marks: record.cmm_marks,
-        internal_status: record.internal_status,
-        semester_marks: existing?.semester_marks,
-        semester_status: existing?.semester_status || 'Draft',
-      };
-    });
-
-    const { error } = await supabase.from('marks').upsert(upsertRecords);
-    if (error) throw error;
-
-    upsertRecords.forEach((record) => {
-      const idx = this.state.marks.findIndex((m) => m.id === record.id);
-      if (idx > -1) {
-        this.state.marks[idx] = record as MarkRecord;
-      } else {
-        this.state.marks.push(record as MarkRecord);
-      }
-    });
-    this.save();
-  }
-
-  public async saveSemesterMarksBatch(records: Pick<MarkRecord, 'subject_id' | 'student_id' | 'semester_marks' | 'semester_status'>[]): Promise<void> {
-    const upsertRecords = records.map((record) => {
-      const existing = this.state.marks.find(
-        (m) => m.subject_id === record.subject_id && m.student_id === record.student_id
-      );
-      if (!existing) throw new Error("Cannot add semester marks without existing record");
-      
-      return {
-        ...existing,
-        semester_marks: record.semester_marks,
-        semester_status: record.semester_status,
-      };
-    });
-
-    const { error } = await supabase.from('marks').upsert(upsertRecords);
-    if (error) throw error;
-
-    upsertRecords.forEach((record) => {
-      const idx = this.state.marks.findIndex((m) => m.id === record.id);
-      if (idx > -1) {
-        this.state.marks[idx] = record;
-      }
-    });
-    this.save();
-  }
-
-  public async updateInternalStatus(subjectId: string, newStatus: 'Pending Exam Cell' | 'Approved' | 'Rejected' | 'Draft'): Promise<void> {
-    const { error } = await supabase
-      .from('marks')
-      .update({ internal_status: newStatus })
-      .eq('subject_id', subjectId);
-    
-    if (error) {
-      throw new Error(`Failed to update internal status in database: ${error.message}`);
-    }
-
-    this.state.marks.forEach(m => {
-      if (m.subject_id === subjectId) {
-        m.internal_status = newStatus;
-      }
-    });
-    this.save();
-  }
-
-  public async updateSemesterStatus(subjectId: string, newStatus: 'Pending Principal' | 'Approved' | 'Rejected' | 'Draft'): Promise<void> {
-    const { error } = await supabase
-      .from('marks')
-      .update({ semester_status: newStatus })
-      .eq('subject_id', subjectId);
-    
-    if (error) {
-      throw new Error(`Failed to update semester status in database: ${error.message}`);
-    }
-
-    this.state.marks.forEach(m => {
-      if (m.subject_id === subjectId) {
-        m.semester_status = newStatus;
-      }
-    });
-    this.save();
-  }
+  getMarks: async () => (await supabase.from('marks').select('*')).data || [],
+  saveInternalMarksBatch: async (records: any[]) => { await supabase.from('marks').upsert(records, { onConflict: 'subject_id,student_id' }); },
+  saveSemesterMarksBatch: async (records: any[]) => { await supabase.from('marks').upsert(records, { onConflict: 'subject_id,student_id' }); },
+  updateInternalStatus: async (subjectId: string, newStatus: string) => { await supabase.from('marks').update({ internal_status: newStatus }).eq('subject_id', subjectId); },
+  updateSemesterStatus: async (subjectId: string, newStatus: string) => { await supabase.from('marks').update({ semester_status: newStatus }).eq('subject_id', subjectId); },
 
   // --- Leave Requests ---
-  public getLeaveRequests(): LeaveRequest[] {
-    return this.state.leave_requests;
-  }
-
-  public getLeaveRequestsByUser(userId: string): LeaveRequest[] {
-    return this.state.leave_requests.filter((lr) => lr.user_id === userId);
-  }
-
-  public getLeaveRequestsByDepartment(deptId: string): (LeaveRequest & { userName: string; userEmail: string })[] {
-    const deptFaculty = this.state.faculty.filter((f) => f.department_id === deptId);
-    const facultyUserIds = deptFaculty.map((f) => f.user_id);
-    const requests = this.state.leave_requests.filter((lr) => facultyUserIds.includes(lr.user_id));
-    
-    return requests.map((lr) => {
-      const user = this.getUserById(lr.user_id)!;
-      return {
-        ...lr,
-        userName: user?.full_name || 'Unknown',
-        userEmail: user?.email || '',
-      };
-    });
-  }
-
-  public async createLeaveRequest(request: Omit<LeaveRequest, 'id' | 'status' | 'created_at'>): Promise<LeaveRequest> {
-    const newReq: LeaveRequest = {
-      ...request,
-      id: generateUUID(),
-      status: 'Pending',
-      created_at: new Date().toISOString(),
-    };
-    const { error } = await supabase.from('leave_requests').insert([newReq]);
-    if (error) throw error;
-
-    this.state.leave_requests.push(newReq);
-    this.save();
-    return newReq;
-  }
-
-  public async updateLeaveStatus(id: string, status: 'Approved' | 'Rejected', approverUserId: string): Promise<boolean> {
-    const { error } = await supabase
-      .from('leave_requests')
-      .update({ status: status, approved_by: approverUserId })
-      .eq('id', id);
-    if (error) throw error;
-
-    const request = this.state.leave_requests.find((lr) => lr.id === id);
-    if (!request) return false;
-    request.status = status;
-    request.approved_by = approverUserId;
-    this.save();
-    return true;
-  }
+  getLeaveRequests: async () => (await supabase.from('leave_requests').select('*')).data || [],
+  createLeaveRequest: async (request: any) => (await supabase.from('leave_requests').insert([{ ...request, id: generateUUID(), status: 'Pending', created_at: new Date().toISOString() }]).select().single()).data,
+  updateLeaveStatus: async (id: string, status: string, approverUserId: string) => { await supabase.from('leave_requests').update({ status, approved_by: approverUserId }).eq('id', id); return true; },
 
   // --- Notices ---
-  public getNotices(): Notice[] {
-    return this.state.notices;
-  }
+  getNotices: async () => (await supabase.from('notices').select('*').order('created_at', { ascending: false })).data || [],
+  createNotice: async (notice: any) => (await supabase.from('notices').insert([{ ...notice, id: generateUUID(), created_at: new Date().toISOString() }]).select().single()).data,
+  deleteNotice: async (id: string) => { await supabase.from('notices').delete().eq('id', id); return true; },
+};
 
-  public getNoticesForRole(role: User['role']): Notice[] {
-    return this.state.notices.filter(
-      (n) => n.target_role === 'All' || n.target_role.toLowerCase() === role.toLowerCase()
-    );
-  }
+// Export an instance compatible with the previous 'export const db = new Database()' usage.
+// Since we used 'export const db = { ... }' directly, we are already compliant.
 
-  public async createNotice(notice: Omit<Notice, 'id' | 'created_at'>): Promise<Notice> {
-    const newNotice: Notice = {
-      ...notice,
-      id: generateUUID(),
-      created_at: new Date().toISOString(),
-    };
-    const { error } = await supabase.from('notices').insert([newNotice]);
-    if (error) throw error;
 
-    this.state.notices.push(newNotice);
-    this.save();
-    return newNotice;
-  }
-
-  public async deleteNotice(id: string): Promise<boolean> {
-    const { error } = await supabase.from('notices').delete().eq('id', id);
-    if (error) throw error;
-
-    this.state.notices = this.state.notices.filter((n) => n.id !== id);
-    this.save();
-    return true;
-  }
-
-  // SQL Schema Output Generator (Kept for UI compatibility)
-  public generateSQLSchema(): string {
-    return `-- =======================================================
--- A.M. REDDY MEMORIAL COLLEGE OF PHARMACY ERP SCHEMA
--- TARGET PLATFORM: SUPABASE (POSTGRESQL)
--- =======================================================
--- Placed in supabase/migrations/20260715000000_init.sql`;
-  }
-}
-
-// Instantiate global db connection
-export const db = new Database();

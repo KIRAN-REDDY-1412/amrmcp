@@ -89,17 +89,38 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   // Form Fields - Password Reset
   const [newPasswordVal, setNewPasswordVal] = useState('');
 
+  // SQL Copy to Clipboard
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const autoSync = async () => {
+      try {
+        setIsSyncing(true);
+        await db.syncWithSupabase();
+        if (isMounted) {
+          db.fetchAllData().then(setDbState);
+        }
+      } catch (err) {
+        console.error("Auto sync failed:", err);
+      } finally {
+        if (isMounted) setIsSyncing(false);
+      }
+    };
+    autoSync();
+    return () => { isMounted = false; };
+  }, []);
+
   useEffect(() => {
     // Sync state
-    setDbState(db.getRawState());
+    if (activeModal === null) {
+      db.fetchAllData().then(setDbState);
+    }
   }, [activeModal]);
 
   const triggerStateRefresh = () => {
-    setDbState({ ...db.getRawState() });
+    db.fetchAllData().then(setDbState);
   };
-
-  // SQL Copy to Clipboard
-  const [isSyncing, setIsSyncing] = useState(false);
 
   const handleCopySQL = () => {
     navigator.clipboard.writeText(db.generateSQLSchema());
@@ -123,7 +144,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
 
   // Backup JSON Export
   const handleExportBackup = () => {
-    const dataStr = JSON.stringify(db.getRawState(), null, 2);
+    const dataStr = JSON.stringify(dbState, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -795,7 +816,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
           if (targetRole === 'hod' || targetRole === 'faculty') {
             const deptCode = row["Department Code"];
             if (deptCode) {
-              const dept = db.getRawState().departments.find(d => d.code.toUpperCase() === String(deptCode).toUpperCase());
+              const dept = dbState.departments.find(d => d.code.toUpperCase() === String(deptCode).toUpperCase());
               if (dept) deptId = dept.id;
             }
           }

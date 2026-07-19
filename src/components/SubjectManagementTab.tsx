@@ -104,7 +104,7 @@ export const SubjectManagementTab: React.FC<Props> = ({ departmentId, isPrincipa
       setSubCourse('');
       setSubYear('');
       setSubSemester('');
-      setDbState(db.getRawState());
+      db.fetchAllData().then(setDbState);
     } catch (error: any) {
       showToast(error.message, 'error');
     }
@@ -115,7 +115,7 @@ export const SubjectManagementTab: React.FC<Props> = ({ departmentId, isPrincipa
     try {
       await db.deleteSubject(id);
       showToast('Subject deleted');
-      setDbState(db.getRawState());
+      db.fetchAllData().then(setDbState);
     } catch (err: any) {
       showToast(err.message, 'error');
     }
@@ -134,7 +134,7 @@ export const SubjectManagementTab: React.FC<Props> = ({ departmentId, isPrincipa
       setActiveModal(null);
       setAssignSubId('');
       setAssignFacId('');
-      setDbState(db.getRawState());
+      db.fetchAllData().then(setDbState);
     } catch (error: any) {
       showToast(error.message, 'error');
     }
@@ -145,7 +145,7 @@ export const SubjectManagementTab: React.FC<Props> = ({ departmentId, isPrincipa
     try {
       await db.deleteAssignment(id);
       showToast('Allocation removed');
-      setDbState(db.getRawState());
+      db.fetchAllData().then(setDbState);
     } catch (err: any) {
       showToast(err.message, 'error');
     }
@@ -223,7 +223,7 @@ export const SubjectManagementTab: React.FC<Props> = ({ departmentId, isPrincipa
 
         await db.saveSubjectsBatch(newSubjects);
         showToast(`Successfully imported ${newSubjects.length} subjects!`, 'success');
-        setDbState(db.getRawState());
+        db.fetchAllData().then(setDbState);
       } catch (err: any) {
         showToast(`Bulk import failed: ${err.message}`, 'error');
       }

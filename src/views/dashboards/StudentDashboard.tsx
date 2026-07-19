@@ -9,7 +9,8 @@ interface Props {
 
 export const StudentDashboard: React.FC<Props> = ({ activeTab }) => {
   const { currentUser, studentProfile } = useAuth();
-  const dbState = db.getRawState();
+  const [dbState, setDbState] = useState(db.getRawState());
+  useEffect(() => { db.fetchAllData().then(setDbState); }, []);
 
   if (!currentUser || !studentProfile) {
     return (

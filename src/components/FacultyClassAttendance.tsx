@@ -8,7 +8,8 @@ import { useToast } from './Toast';
 export const FacultyClassAttendance: React.FC = () => {
   const { currentUser, facultyProfile } = useAuth();
   const { showToast } = useToast();
-  const dbState = db.getRawState();
+  const [dbState, setDbState] = useState(db.getRawState());
+  useEffect(() => { db.fetchAllData().then(setDbState); }, []);
 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedSlot, setSelectedSlot] = useState<TimetableSlot | null>(null);

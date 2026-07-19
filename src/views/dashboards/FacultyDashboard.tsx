@@ -55,11 +55,11 @@ export const FacultyDashboard: React.FC<DashboardProps> = ({ activeTab, searchFi
   const [newSlotAssignId, setNewSlotAssignId] = useState('');
 
   useEffect(() => {
-    setDbState(db.getRawState());
+    db.fetchAllData().then(setDbState);
   }, [activeModal]);
 
   const triggerStateRefresh = () => {
-    setDbState({ ...db.getRawState() });
+    db.fetchAllData().then(setDbState);
   };
 
   if (!facultyProfile) {

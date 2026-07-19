@@ -68,11 +68,11 @@ export const HODDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilter
   const [newPasswordVal, setNewPasswordVal] = useState('');
 
   useEffect(() => {
-    setDbState(db.getRawState());
+    db.fetchAllData().then(setDbState);
   }, [activeModal]);
 
   const triggerStateRefresh = () => {
-    setDbState({ ...db.getRawState() });
+    db.fetchAllData().then(setDbState);
   };
 
   const handleProfileSave = async (e: React.FormEvent) => {

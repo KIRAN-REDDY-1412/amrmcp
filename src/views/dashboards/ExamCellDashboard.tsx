@@ -21,11 +21,11 @@ export const ExamCellDashboard: React.FC<Props> = ({ activeTab }) => {
   const [batchStatus, setBatchStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    setDbState(db.getRawState());
+    db.fetchAllData().then(setDbState);
   }, []);
 
   const triggerStateRefresh = () => {
-    setDbState({ ...db.getRawState() });
+    db.fetchAllData().then(setDbState);
   };
 
   const handleApproveInternal = async (subjectId: string) => {

@@ -13,7 +13,8 @@ interface Props {
 export const AttendanceManager: React.FC<Props> = ({ isReadOnly = false, canEditSubmitted = false }) => {
   const { currentUser } = useAuth();
   const { showToast } = useToast();
-  const dbState = db.getRawState();
+  const [dbState, setDbState] = useState(db.getRawState());
+  useEffect(() => { db.fetchAllData().then(setDbState); }, []);
 
   // Filters
   const [course, setCourse] = useState('');

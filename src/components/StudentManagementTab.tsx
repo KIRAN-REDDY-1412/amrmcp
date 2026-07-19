@@ -49,11 +49,30 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    setDbState(db.getRawState());
+    db.fetchAllData().then(setDbState);
   }, [activeModal]);
 
+  useEffect(() => {
+    let isMounted = true;
+    const autoSync = async () => {
+      try {
+        setIsSyncing(true);
+        await db.syncWithSupabase();
+        if (isMounted) {
+          db.fetchAllData().then(setDbState);
+        }
+      } catch (err) {
+        console.error("Auto sync failed:", err);
+      } finally {
+        if (isMounted) setIsSyncing(false);
+      }
+    };
+    autoSync();
+    return () => { isMounted = false; };
+  }, []);
+
   const triggerStateRefresh = () => {
-    setDbState({ ...db.getRawState() });
+    db.fetchAllData().then(setDbState);
   };
 
   const handleSync = async () => {
@@ -341,8 +360,8 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
 
           let finalDeptId = isGlobal ? '' : myDeptId;
           
-          if (isGlobal && db.getRawState().departments.length > 0) {
-            finalDeptId = db.getRawState().departments[0].id;
+          if (isGlobal && dbState.departments.length > 0) {
+            finalDeptId = dbState.departments[0].id;
           }
 
           if (!name || !roll || !course) {
@@ -351,7 +370,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             continue;
           }
 
-          const rollExists = db.getRawState().students.some(
+          const rollExists = dbState.students.some(
             (s) => s.roll_number && s.roll_number.toLowerCase() === String(roll).toLowerCase()
           );
           

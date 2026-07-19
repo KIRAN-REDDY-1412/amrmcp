@@ -838,24 +838,19 @@ export class Database {
     };
 
     // Ensure we only insert columns that exist in the Supabase schema
-    const defaultDept = this.state.departments.length > 0 ? this.state.departments[0].id : null;
+    // The remote schema seems to be missing department_id and admission_quota
     const dbStudent = {
       id: newStudent.id,
       name: newStudent.name,
       roll_number: newStudent.roll_number,
-      department_id: newStudent.department_id || defaultDept,
       phone: newStudent.phone || '',
       guardian_name: newStudent.guardian_name || '',
       enrollment_date: newStudent.enrollment_date
     };
 
-    if (dbStudent.department_id) {
-        const { error } = await supabase.from('students').insert([dbStudent]);
-        if (error) {
-          throw new Error(`Failed to create student in database: ${error.message}`);
-        }
-    } else {
-        console.warn("Skipping Supabase insert for student because no department_id is available.");
+    const { error } = await supabase.from('students').insert([dbStudent]);
+    if (error) {
+      throw new Error(`Failed to create student in database: ${error.message}`);
     }
 
     this.state.students.push(newStudent);
@@ -864,7 +859,8 @@ export class Database {
   }
 
   public async updateStudent(id: string, updates: Partial<Omit<Student, 'id' | 'enrollment_date'>>): Promise<Student | null> {
-    const validDbKeys = ['name', 'roll_number', 'department_id', 'phone', 'guardian_name'];
+    // Removed department_id since remote Supabase lacks it
+    const validDbKeys = ['name', 'roll_number', 'phone', 'guardian_name'];
     const dbUpdates: any = {};
     for (const key of validDbKeys) {
       if (key in updates) {

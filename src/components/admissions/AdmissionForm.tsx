@@ -68,13 +68,11 @@ export const AdmissionForm: React.FC<AdmissionFormProps> = ({ onComplete }) => {
     setIsSubmitting(true);
     try {
       // 1. Insert Student Record
-      const defaultDept = '00000000-0000-0000-0000-000000000000'; // Need a valid UUID or look it up
       const { data: student, error: studentError } = await supabase
         .from('students')
         .insert({
           name,
           roll_number: `TEMP-${Date.now()}`, // Temporary roll number since it's required and unique
-          department_id: defaultDept,
           phone,
           guardian_name: fatherName || motherName || 'Unknown',
         })

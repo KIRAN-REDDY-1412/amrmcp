@@ -75,46 +75,45 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
     }
   }, [activeModal, isGlobal, myDeptId, dbState.departments]);
 
-  const handleCreateStudent = async (e: React.FormEvent) => {
+  const handleSaveNewStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studRoll || !studPassword) {
-      showToast('Please enter both roll number and password.', 'warning');
-      return;
-    }
-
-    const student = dbState.students.find(
-      (s) => s.roll_number && s.roll_number.toLowerCase() === studRoll.toLowerCase()
-    );
-
-    if (!student) {
-      showToast('Student with this roll number not found. Ensure Admission Cell has added them.', 'error');
-      return;
-    }
-
-    if (student.status === 'ERP Account Active') {
-      showToast('This student is already registered in the ERP.', 'info');
+    if (!studName || !studRoll || !studCourse) {
+      showToast('Please enter at least Name, Roll Number, and Course.', 'warning');
       return;
     }
 
     try {
-      await db.registerStudentToERP(student.id, studPassword);
+      await db.createStudent({
+        name: studName,
+        roll_number: studRoll,
+        dob: studDob || undefined,
+        course: studCourse,
+        branch: studCourse === 'M.PHARM' ? studBranch : undefined,
+        year: studYear || undefined,
+        semester: (studCourse === 'B.PHARM' || studCourse === 'M.PHARM') ? studSemester : undefined,
+        section: studSection || undefined,
+        academic_year: studAcademicYear || undefined,
+        batch: studBatch || undefined,
+        department_id: studDeptId || undefined,
+        phone: studPhone || '',
+        guardian_name: studGuardian || '',
+        status: 'Draft',
+        admission_quota: 'Convenor',
+        gender: 'Male'
+      });
       await db.logAction(
         currentUser.id,
         currentUser.email,
         currentUser.role,
-        'Register Student ERP',
-        `Activated ERP account for Roll: ${studRoll}`
+        'Create Student',
+        `Manually created student: ${studName}`
       );
-      showToast(`ERP Account activated for ${student.name}`, 'success');
+      showToast(`Student ${studName} created successfully.`, 'success');
       setActiveModal(null);
       triggerStateRefresh();
-
-      // Clear
-      setStudRoll('');
-      setStudPassword('');
     } catch (err: any) {
-      console.error("Student ERP Reg Error:", err);
-      showToast(`Registration failed: ${err.message || 'Unknown error'}`, 'error');
+      console.error("Student Creation Error:", err);
+      showToast(`Creation failed: ${err.message || 'Unknown error'}`, 'error');
     }
   };
 
@@ -427,6 +426,17 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
             </button>
             <button
               onClick={() => {
+                // Clear form
+                setStudName(''); setStudRoll(''); setStudDob(''); setStudCourse('');
+                setStudBranch(''); setStudYear(''); setStudSemester(''); setStudSection('');
+                setActiveModal('create_student');
+              }}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-white dark:bg-navy-800 text-primary-600 hover:bg-slate-50 dark:hover:bg-navy-700 border border-slate-200 dark:border-navy-700 rounded-xl text-sm font-bold transition-colors"
+            >
+              <Plus size={16} /> Add Student
+            </button>
+            <button
+              onClick={() => {
                 setUploadFile(null);
                 setUploadDeptId(isGlobal ? '' : myDeptId);
                 setActiveModal('bulk_upload');
@@ -584,7 +594,7 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
               </button>
             </div>
             
-            <form onSubmit={handleUpdateStudent} className="p-5 space-y-4 overflow-y-auto max-h-[75vh]">
+            <form onSubmit={activeModal === 'create_student' ? handleSaveNewStudent : handleUpdateStudent} className="p-5 space-y-4 overflow-y-auto max-h-[75vh]">
               <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Full Name *</label>
@@ -604,6 +614,10 @@ export const StudentManagementTab: React.FC<StudentManagementTabProps> = ({ sear
                       <option value="M.PHARM">M.Pharm</option>
                       <option value="PHARM.D">Pharm.D</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-navy-600 dark:text-navy-300 uppercase tracking-wider">Roll Number *</label>
+                    <input type="text" required value={studRoll} onChange={(e) => setStudRoll(e.target.value.toUpperCase())} className="mt-1 block w-full p-2.5 border border-slate-200 dark:border-navy-800 rounded-xl bg-slate-50 dark:bg-navy-950 text-sm text-navy-900 dark:text-white" />
                   </div>
                   {studCourse === 'M.PHARM' && (
                     <div>

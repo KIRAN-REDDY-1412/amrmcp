@@ -822,6 +822,10 @@ export class Database {
     return this.state.students.find((s) => s.user_id === userId);
   }
 
+  public getStudentByRollNumber(rollNumber: string): Student | undefined {
+    return this.state.students.find((s) => s.roll_number?.toLowerCase() === rollNumber.toLowerCase());
+  }
+
   public getStudentsByDepartment(deptId: string): Student[] {
     return this.state.students.filter((s) => s.department_id === deptId);
   }
@@ -915,6 +919,74 @@ export class Database {
     if (updateError) throw updateError;
     
     await this.syncWithSupabase();
+    return true;
+  }
+
+  public async selfRegisterStudent(rollNumber: string, email: string, password: string): Promise<boolean> {
+    const student = this.getStudentByRollNumber(rollNumber);
+    if (!student) throw new Error('Student roll number not found in the system.');
+    if (student.status === 'ERP Account Active' || student.user_id) {
+      throw new Error('This student is already registered in the ERP.');
+    }
+
+    // 1. Create auth user
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: email.toLowerCase(),
+      password: password,
+      options: { data: { full_name: student.name, role: 'student' } }
+    });
+    
+    if (authError) {
+      // Handle "already registered" error gracefully for mock scenarios
+      if (authError.message.includes('already registered') || authError.message.includes('already exist')) {
+        throw new Error('Email is already registered. Please use a different email or login.');
+      }
+      throw authError;
+    }
+    
+    // In mock setup without email confirmation, user might not be returned immediately if confirmation is required.
+    // Assuming auto-confirm is on or we mock it:
+    let newUserId = authData?.user?.id;
+    if (!newUserId) {
+       newUserId = generateUUID(); // fallback for prototype
+    }
+
+    // 2. Add to public.users
+    const { error: userError } = await supabase.from('users').upsert({
+      id: newUserId,
+      email: email.toLowerCase(),
+      role: 'student',
+      full_name: student.name,
+      is_active: true
+    });
+    
+    if (userError) throw userError;
+
+    // 3. Link to student and change status
+    const { error: updateError } = await supabase.from('students').update({
+      user_id: newUserId,
+      status: 'ERP Account Active',
+      email: email.toLowerCase()
+    }).eq('id', student.id);
+
+    if (updateError) throw updateError;
+    
+    // Update local state
+    if (!this.state.users.find(u => u.id === newUserId)) {
+      this.state.users.push({
+        id: newUserId,
+        email: email.toLowerCase(),
+        role: 'student',
+        full_name: student.name,
+        is_active: true,
+        created_at: new Date().toISOString()
+      });
+    }
+    student.user_id = newUserId;
+    student.status = 'ERP Account Active';
+    student.email = email.toLowerCase();
+    this.save();
+    
     return true;
   }
 

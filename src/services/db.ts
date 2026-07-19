@@ -359,14 +359,27 @@ export class Database {
     const mergeArrays = (local: any[], remote: any[] | null) => {
       if (!remote) return local;
       
-      return remote.map(remoteItem => {
-        const localItem = local.find(l => l.id === remoteItem.id);
-        if (localItem) {
-          // Merge to preserve local-only fields that might be missing in remote schema
-          return { ...localItem, ...remoteItem };
+      const mergedMap = new Map();
+      
+      // 1. Add all local items to preserve them (prevents RLS or missing remote data from wiping local state)
+      local.forEach(item => {
+        if (item && item.id) {
+          mergedMap.set(item.id, item);
         }
-        return remoteItem;
       });
+      
+      // 2. Overwrite/merge with remote items
+      remote.forEach(remoteItem => {
+        if (!remoteItem || !remoteItem.id) return;
+        const localItem = mergedMap.get(remoteItem.id);
+        if (localItem) {
+          mergedMap.set(remoteItem.id, { ...localItem, ...remoteItem });
+        } else {
+          mergedMap.set(remoteItem.id, remoteItem);
+        }
+      });
+      
+      return Array.from(mergedMap.values());
     };
 
     try {

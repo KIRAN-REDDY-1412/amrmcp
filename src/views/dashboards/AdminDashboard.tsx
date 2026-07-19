@@ -42,7 +42,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
   const [copiedSQL, setCopiedSQL] = useState(false);
 
   // Forms Modals Toggle
-  const [activeModal, setActiveModal] = useState<'create_dept' | 'edit_dept' | 'create_user' | 'edit_user' | 'create_student' | 'edit_student' | 'reset_password' | 'view_users' | 'bulk_upload' | null>(null);
+  const [activeModal, setActiveModal] = useState<'create_dept' | 'edit_dept' | 'create_user' | 'edit_user' | 'create_student' | 'edit_student' | 'reset_password' | 'view_users' | 'bulk_upload' | 'bulk_upload_students' | null>(null);
   const [viewRole, setViewRole] = useState<'principal' | 'hod' | 'faculty' | null>(null);
   
   // User Directory Filter (Staff vs Students)
@@ -146,7 +146,96 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
     }
   };
 
-  // Department Actions
+  const handleDownloadStudentTemplate = () => {
+    const templateData = [{
+      "Name": "John Doe",
+      "Email": "john@student.edu",
+      "Password": "Password123!",
+      "Roll Number": "Y26BP1234",
+      "Course": "B.Pharm"
+    }];
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+    XLSX.writeFile(workbook, `existing_students_template.xlsx`);
+  };
+
+  const handleBulkUploadStudents = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile) return;
+
+    setIsUploading(true);
+    try {
+      const data = await uploadFile.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<any>(worksheet);
+
+      let successCount = 0;
+      let errorCount = 0;
+      let lastErrorMsg = "";
+
+      for (const row of rows) {
+        try {
+          const name = row["Name"];
+          const email = row["Email"];
+          const password = row.Password || "Password123!";
+          const rollNumber = row["Roll Number"];
+          const course = row["Course"];
+
+          if (!name || !email || !rollNumber || !course) {
+            errorCount++;
+            lastErrorMsg = "Missing required fields: Name, Email, Roll Number, or Course";
+            continue;
+          }
+
+          // 1. Create auth user
+          const newUser = await db.createUser({
+            email: email.toLowerCase(),
+            password,
+            role: 'student',
+            full_name: name,
+            is_active: true,
+          });
+
+          // 2. Create student record (using db.createStudent which strips invalid fields for Supabase)
+          await db.createStudent({
+            name,
+            roll_number: rollNumber,
+            course,
+            user_id: newUser.id,
+            email: email.toLowerCase(),
+            status: 'ERP Account Active',
+            admission_quota: 'Convenor',
+            gender: 'Male',
+            phone: '',
+            guardian_name: ''
+          });
+
+          successCount++;
+        } catch (err: any) {
+          errorCount++;
+          lastErrorMsg = err.message || "Unknown error";
+        }
+      }
+
+      if (errorCount > 0) {
+        showToast(`Imported ${successCount} students. Failed ${errorCount}. Last error: ${lastErrorMsg}`, 'warning');
+      } else {
+        showToast(`Successfully imported ${successCount} students!`, 'success');
+      }
+      
+      triggerStateRefresh();
+      setActiveModal(null);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to process Excel file.', 'error');
+    } finally {
+      setIsUploading(false);
+      setUploadFile(null);
+    }
+  };
+
+  // --- Department UI Handlers ---
   const handleCreateDept = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deptName || !deptCode) return;
@@ -997,6 +1086,17 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                     <Plus size={16} /> Register Student ERP
                   </button>
                 )}
+                {activeTab === 'users' && (
+                  <button
+                    onClick={() => {
+                      setUploadFile(null);
+                      setActiveModal('bulk_upload_students');
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-navy-800 dark:hover:bg-navy-700 text-white rounded-xl text-sm font-bold shadow-md transition-colors"
+                  >
+                    <Upload size={16} /> Import Existing Students
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setIsAssignExisting(false);
@@ -1726,6 +1826,39 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ activeTab, searchFilt
                   className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
                 >
                   {isUploading ? 'Uploading...' : 'Process Bulk Registration'}
+                </button>
+              </form>
+            )}
+
+            {activeModal === 'bulk_upload_students' && (
+              <form onSubmit={handleBulkUploadStudents} className="space-y-4">
+                <div className="flex justify-end mb-2">
+                  <button 
+                    type="button"
+                    onClick={handleDownloadStudentTemplate}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-navy-800 dark:hover:bg-navy-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold transition-colors"
+                  >
+                    <Download size={14} /> Download Template
+                  </button>
+                </div>
+                <div className="bg-slate-50 dark:bg-navy-950 p-4 rounded-xl border border-dashed border-slate-300 dark:border-navy-700 text-center">
+                  <Upload className="mx-auto text-navy-400 mb-2" size={24} />
+                  <p className="text-sm font-bold text-navy-900 dark:text-white mb-1">Upload Existing Students Excel File</p>
+                  <p className="text-xs text-navy-500 mb-3">Required Columns: Name, Email, Password, Roll Number, Course</p>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    required
+                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                    className="block w-full text-xs text-navy-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-navy-800 dark:file:text-white"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isUploading || !uploadFile}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                >
+                  {isUploading ? 'Importing...' : 'Import Students'}
                 </button>
               </form>
             )}

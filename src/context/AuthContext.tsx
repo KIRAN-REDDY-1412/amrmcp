@@ -152,11 +152,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await supabase.auth.signOut();
             throw new Error(`User record not found. The registered admin is ${existingAdmins[0]?.email}. Please use the correct email.`);
           }
+        } else {
+          // DIRECT SUPABASE FALLBACK:
+          // If not found in local state, fetch directly from Supabase users table
+          const { data: remoteUser, error: remoteError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authData.user.id)
+            .single();
+
+          if (remoteUser) {
+            user = remoteUser as User;
+            // Ensure they get pushed to local state to fix the gap
+            db.forceAddUserToLocalState(user);
+          }
         }
 
         if (!user) {
           await supabase.auth.signOut();
-          throw new Error('User record not found in system database.');
+          throw new Error('User record not found in system database or Supabase.');
         }
       }
 

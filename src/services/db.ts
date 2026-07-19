@@ -486,6 +486,13 @@ export class Database {
     return user;
   }
 
+  public forceAddUserToLocalState(user: User) {
+    if (!this.state.users.find(u => u.id === user.id)) {
+      this.state.users.push(user);
+      this.save();
+    }
+  }
+
   public async createUser(user: Omit<User, 'id' | 'created_at'>): Promise<User> {
     const authClient = createAuthClient();
     const password = (user as any).password || 'DefaultPassword123!';
